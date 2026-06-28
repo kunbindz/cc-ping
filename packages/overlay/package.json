@@ -1,0 +1,13 @@
+{
+  "name": "cc-ping-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "cc-ping overlay — Tauri background app: loopback event server + mascot animation + sound.",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "license": "MIT"
+}

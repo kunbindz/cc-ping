@@ -1,0 +1,32 @@
+{
+  "name": "cc-ping",
+  "version": "0.1.0",
+  "description": "Claude Code hook handler for cc-ping: terminal bell + fire-and-forget event to the cc-ping overlay.",
+  "type": "module",
+  "bin": {
+    "cc-ping": "./cli.mjs"
+  },
+  "exports": {
+    ".": "./notify.mjs"
+  },
+  "files": [
+    "notify.mjs",
+    "cli.mjs",
+    "install.mjs",
+    "uninstall.mjs",
+    "lib/"
+  ],
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "keywords": [
+    "claude-code",
+    "hook",
+    "notification",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

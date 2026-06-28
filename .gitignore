@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+packages/overlay/src-tauri/target/
+packages/overlay/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local runtime state (created at ~/.cc-ping at runtime, never in repo)
+.cc-ping/

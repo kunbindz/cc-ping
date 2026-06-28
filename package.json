@@ -1,0 +1,16 @@
+{
+  "name": "cc-ping-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Desktop notification + mascot pop-out for Claude Code.",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test:hook": "node packages/hook/test/run.mjs",
+    "overlay:dev": "pnpm --filter cc-ping-overlay tauri dev",
+    "overlay:build": "pnpm --filter cc-ping-overlay tauri build"
+  },
+  "license": "MIT"
+}
