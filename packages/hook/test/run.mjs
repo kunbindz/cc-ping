@@ -1,51 +1,255 @@
-// test/run.mjs — acceptance harness for the hook. Spawns notify.mjs with stdin payloads
-// and asserts the CONTRACT §3 behavior. Run: `node test/run.mjs` (or `pnpm test:hook`).
-// Phase 1 cases are live below. Codex: add Phase 2 / Phase 5 cases as you implement them.
+// Hook acceptance harness. Run with: node packages/hook/test/run.mjs
+import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const NOTIFY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'notify.mjs');
+const HOOK_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const NOTIFY = path.join(HOOK_DIR, 'notify.mjs');
+const CLI = path.join(HOOK_DIR, 'cli.mjs');
+const BEL = '\u0007';
 
-/** Run notify.mjs with the given stdin string; resolve { stdout, code }. */
-function run(stdin) {
+let failures = 0;
+const tempRoots = [];
+
+function tempHome() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'cc-ping-test-'));
+  tempRoots.push(dir);
+  return dir;
+}
+
+function runNode(args, { stdin = '', home = tempHome(), timeoutMs = 2000 } = {}) {
   return new Promise((resolve) => {
-    const p = spawn(process.execPath, [NOTIFY], { stdio: ['pipe', 'pipe', 'inherit'] });
-    let out = '';
-    p.stdout.on('data', (d) => (out += d));
-    p.on('close', (code) => resolve({ stdout: out, code }));
-    p.stdin.end(stdin);
+    const env = {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+    };
+    const child = spawn(process.execPath, args, {
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, code, timedOut, home });
+    });
+    child.stdin.end(stdin);
   });
 }
 
-let failures = 0;
-function check(name, cond) {
-  process.stdout.write(`${cond ? 'PASS' : 'FAIL'}  ${name}\n`);
+function runNotify(stdin, options) {
+  return runNode([NOTIFY], { stdin, ...options });
+}
+
+function check(name, cond, detail = '') {
+  process.stdout.write(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? ` (${detail})` : ''}\n`);
   if (!cond) failures++;
 }
 
-// ── Phase 1 acceptance (CONTRACT §3) ────────────────────────────────────────
-{
-  const r = await run('{"cwd":"/tmp/foo","hook_event_name":"Stop"}');
-  check('Stop → emits terminalSequence, exit 0',
-    r.code === 0 && r.stdout.includes('terminalSequence') && JSON.parse(r.stdout).terminalSequence === '');
-}
-{
-  const r = await run('{"stop_hook_active":true}');
-  check('stop_hook_active → exit 0, no terminalSequence',
-    r.code === 0 && !r.stdout.includes('terminalSequence'));
-}
-{
-  const r = await run('not json @#$');
-  check('garbage stdin → exit 0, no throw', r.code === 0);
-}
-{
-  const r = await run('');
-  check('empty stdin → exit 0, no throw', r.code === 0);
+function parseSettings(home) {
+  return JSON.parse(readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8'));
 }
 
-// TODO (Codex): Phase 2 cases — threshold silences short tasks, quietProjects, config defaults.
-// TODO (Codex): Phase 5 cases — POST attempted but overlay-down still exits 0 fast.
+function writeConfig(home, config) {
+  const dir = path.join(home, '.cc-ping');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, 'config.json'), `${JSON.stringify(config)}\n`, 'utf8');
+}
 
-process.stdout.write(`\n${failures === 0 ? 'ALL PASS' : failures + ' FAILED'}\n`);
+function writeTranscript(home, name, rows) {
+  const file = path.join(home, `${name}.jsonl`);
+  writeFileSync(file, rows.map((row) => (typeof row === 'string' ? row : JSON.stringify(row))).join('\n'), 'utf8');
+  return file;
+}
+
+async function withServer(handler) {
+  const events = [];
+  const server = createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/event') {
+      let body = '';
+      req.on('data', (chunk) => (body += chunk));
+      req.on('end', () => {
+        try {
+          events.push(JSON.parse(body));
+        } catch {
+          events.push(null);
+        }
+        res.writeHead(204);
+        res.end();
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end();
+  });
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    return await handler(server.address().port, events);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+try {
+  {
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Stop"}');
+    const payload = JSON.parse(r.stdout || '{}');
+    check('Stop emits terminalSequence, exit 0', r.code === 0 && payload.terminalSequence === BEL);
+  }
+  {
+    const r = await runNotify('{"stop_hook_active":true}');
+    check('stop_hook_active exits 0 with no output', r.code === 0 && r.stdout === '');
+  }
+  {
+    const r = await runNotify('not json @#$');
+    check('garbage stdin exits 0 without throwing', r.code === 0);
+  }
+  {
+    const r = await runNotify('');
+    check('empty stdin exits 0 without throwing', r.code === 0);
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { minDurationMs: 10000, overlay: false });
+    const transcript = writeTranscript(home, 'short', [
+      { type: 'user', timestamp: '2026-06-28T00:00:00.000Z' },
+      { type: 'assistant', timestamp: '2026-06-28T00:00:05.000Z' },
+    ]);
+    const r = await runNotify(
+      JSON.stringify({ cwd: '/tmp/foo', hook_event_name: 'Stop', transcript_path: transcript }),
+      { home }
+    );
+    check('short Stop below minDurationMs stays silent', r.code === 0 && r.stdout === '');
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { minDurationMs: 10000, overlay: false });
+    const transcript = writeTranscript(home, 'long', [
+      { type: 'user', timestamp: '2026-06-28T00:00:00.000Z' },
+      { type: 'assistant', timestamp: '2026-06-28T00:00:12.000Z' },
+    ]);
+    const r = await runNotify(
+      JSON.stringify({ cwd: '/tmp/foo', hook_event_name: 'Stop', transcript_path: transcript }),
+      { home }
+    );
+    const payload = JSON.parse(r.stdout || '{}');
+    check('long Stop over threshold rings bell', r.code === 0 && payload.terminalSequence === BEL);
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { quietProjects: ['foo'], overlay: false });
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Notification"}', { home });
+    check('quietProjects silences all signal paths', r.code === 0 && r.stdout === '');
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { minDurationMs: 999999, overlay: false });
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Notification"}', { home });
+    const payload = JSON.parse(r.stdout || '{}');
+    check('Notification bypasses duration threshold', r.code === 0 && payload.terminalSequence === BEL);
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { bell: false, overlay: false });
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Stop"}', { home });
+    check('config.bell=false omits terminalSequence', r.code === 0 && r.stdout === '');
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { bell: false, overlay: true, overlayPort: port });
+      const transcript = writeTranscript(home, 'post', [
+        'malformed',
+        { type: 'user', timestamp: 1000 },
+        { type: 'assistant', timestamp: 1012 },
+      ]);
+      const r = await runNotify(
+        JSON.stringify({
+          cwd: '/tmp/foo',
+          hook_event_name: 'SubagentStop',
+          session_id: 'abc123',
+          agent_type: 'reviewer',
+          transcript_path: transcript,
+        }),
+        { home }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      check('POST sends contract body to overlay', r.code === 0 && events.length === 1);
+      check(
+        'POST maps SubagentStop to done with metadata',
+        events[0]?.type === 'done' &&
+          events[0]?.project === 'foo' &&
+          events[0]?.sessionId === 'abc123' &&
+          events[0]?.agentType === 'reviewer' &&
+          events[0]?.durationMs === 12000
+      );
+    });
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { overlay: true, overlayPort: 9 });
+    const started = Date.now();
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Stop"}', { home });
+    check('overlay down exits fast and still rings bell', r.code === 0 && Date.now() - started < 1000 && r.stdout.includes('terminalSequence'));
+  }
+  {
+    const home = tempHome();
+    const claudeDir = path.join(home, '.claude');
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(
+      path.join(claudeDir, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          Stop: [{ hooks: [{ type: 'command', command: 'node other.mjs' }] }],
+        },
+        keep: true,
+      }),
+      'utf8'
+    );
+
+    const first = await runNode([CLI, 'install'], { home });
+    const second = await runNode([CLI, 'install'], { home });
+    const settings = parseSettings(home);
+    const stopHooks = settings.hooks.Stop.flatMap((block) => block.hooks ?? []);
+    const ccPingHooks = stopHooks.filter((hook) => hook.command?.includes('notify.mjs'));
+    check('install succeeds twice', first.code === 0 && second.code === 0);
+    check('install is idempotent and preserves existing hooks', ccPingHooks.length === 1 && stopHooks.some((hook) => hook.command === 'node other.mjs') && settings.keep === true);
+
+    const uninstall = await runNode([CLI, 'uninstall'], { home });
+    const after = parseSettings(home);
+    const afterStopHooks = after.hooks.Stop.flatMap((block) => block.hooks ?? []);
+    check('uninstall succeeds', uninstall.code === 0);
+    check('uninstall removes only cc-ping hook entries', afterStopHooks.length === 1 && afterStopHooks[0].command === 'node other.mjs');
+  }
+} finally {
+  for (const dir of tempRoots) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+process.stdout.write(`\n${failures === 0 ? 'ALL PASS' : `${failures} FAILED`}\n`);
 process.exit(failures === 0 ? 0 : 1);

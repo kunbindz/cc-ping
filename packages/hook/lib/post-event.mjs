@@ -1,8 +1,22 @@
-// post-event.mjs — fire-and-forget POST to the overlay. NEVER throws, NEVER blocks turn end.
-// CONTRACT §2 (body) + §3 Path B (timeout ≤300ms, swallow errors, no retry).
-// STATUS: STUB — Phase 5 (Codex).
+// Fire-and-forget POST to the overlay. NEVER throws, NEVER blocks turn end.
+// CONTRACT: timeout <=300ms, swallow errors, no retry.
+import { spawn } from 'node:child_process';
 
 const TIMEOUT_MS = 300;
+const HELPER = `
+const port = Number(process.argv[1]) || 47321;
+let body = {};
+try { body = JSON.parse(process.argv[2] || '{}'); } catch {}
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), ${TIMEOUT_MS});
+timer.unref?.();
+fetch('http://127.0.0.1:' + port + '/event', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+  signal: controller.signal
+}).catch(() => {}).finally(() => clearTimeout(timer));
+`;
 
 /**
  * POST an event to the overlay at 127.0.0.1:<port>/event. Fire-and-forget.
@@ -11,11 +25,14 @@ const TIMEOUT_MS = 300;
  * @param {number} [port=47321]
  */
 export function postEvent(body, port = 47321) {
-  // TODO (Codex, Phase 5): use global fetch with AbortController(TIMEOUT_MS).
-  // Do not await in a way that delays process exit beyond the bell. Swallow all errors:
-  //   fetch(url, {method:'POST', signal, headers, body: JSON.stringify(body)}).catch(()=>{});
-  // Consider `process.exitCode = 0` semantics — the bell was already written synchronously.
-  void body;
-  void port;
-  void TIMEOUT_MS;
+  try {
+    const child = spawn(process.execPath, ['-e', HELPER, String(port), JSON.stringify(body)], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+  } catch {
+    // Overlay delivery is best-effort only.
+  }
 }
