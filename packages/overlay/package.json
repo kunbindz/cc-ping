@@ -9,5 +9,8 @@
     "build": "tauri build",
     "tauri": "tauri"
   },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
   "license": "MIT"
 }
