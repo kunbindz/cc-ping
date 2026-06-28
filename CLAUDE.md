@@ -75,18 +75,23 @@ cc-ping/
 │  │
 │  └─ overlay/          # ── OWNED BY CLAUDE ──  Tauri app, system-tray background process.
 │     ├─ src-tauri/           # Rust core
-│     │  ├─ src/main.rs       # app bootstrap, tray, single-instance, window mgmt
-│     │  ├─ src/server.rs     # loopback HTTP server (axum or tiny-http)
+│     │  ├─ src/main.rs       # bin entry → calls lib::run()
+│     │  ├─ src/lib.rs        # app bootstrap: tray, single-instance, window mgmt + positioning
+│     │  ├─ src/server.rs     # loopback HTTP server (tiny_http): GET /health + POST /event
+│     │  ├─ src/config.rs     # reads ~/.cc-ping/config.json (port + sound map)
+│     │  ├─ src/sound.rs      # plays embedded WAV via rodio (native, avoids webview autoplay)
+│     │  ├─ capabilities/default.json  # Tauri 2 permissions for the mascot window
+│     │  ├─ icons/            # generated app/tray icons (PNG + ICO)
 │     │  ├─ Cargo.toml
 │     │  └─ tauri.conf.json   # transparent/alwaysOnTop/skipTaskbar/visible:false window
-│     ├─ src/                 # frontend
-│     │  ├─ index.html
-│     │  ├─ main.ts           # listen Tauri "cc-ping-event", drive UI
-│     │  ├─ mascot.ts         # animation state machine
+│     ├─ src/                 # frontend (plain ES modules — NO build step; uses window.__TAURI__)
+│     │  ├─ index.html        # inline Pip SVG + speech bubble
+│     │  ├─ main.js           # listen Tauri "cc-ping-event", coalesce bursts, show/hide window
+│     │  ├─ mascot.js         # mood + show↔hide animation state machine
 │     │  └─ styles.css
 │     ├─ assets/
-│     │  ├─ mascot/           # original SVG/sprite mascot art (self-drawn, codename TBD)
-│     │  └─ sounds/           # ting / soft / buzz short clips
+│     │  ├─ mascot/pip.svg    # original mascot art — codename "Pip" (self-drawn, not Anthropic)
+│     │  └─ sounds/           # ting.wav / soft.wav / buzz.wav (generated, embedded at build)
 │     └─ package.json
 │
 ├─ assets/
@@ -126,8 +131,8 @@ Build sequentially (per MASTER_PLAN.md). Commit after each phase passes acceptan
 | 0 | Repo scaffold + CONTRACT + CLAUDE.md + spike | Claude | ✅ done (this commit) |
 | 1 | Hook MVP: bell + log on Stop | Codex | 🌱 seeded (notify.mjs + read-stdin.mjs work; needs install.mjs + tests) |
 | 2 | Config + threshold + duration | Codex | ⬜ stubs in place |
-| 3 | Overlay skeleton + loopback server + tray | Claude | ⬜ not started |
-| 4 | Mascot animation + sound | Claude | ⬜ not started |
+| 3 | Overlay skeleton + loopback server + tray | Claude | ✅ code complete (Tauri 2; awaiting a `tauri dev` run on a GUI machine to visually confirm) |
+| 4 | Mascot animation + sound | Claude | ✅ code complete (Pip mascot, 3 moods, 3 generated WAVs, burst-coalescing) |
 | 5 | Wire hook → overlay (close the loop) | both | ⬜ — **milestone "complete idea"**; record demo GIF here |
 | 6 | Packaging, install, docs, release CI | Claude | ⬜ not started |
 
@@ -190,8 +195,11 @@ curl -X POST http://127.0.0.1:47321/event -H 'content-type: application/json' \
 4. **Audio autoplay**: a webview may block `<audio>` without a user gesture → play sound from
    the **Rust side (rodio)**, not the frontend. (Overlay implementation note.)
 5. **Transparent always-on-top window** on Windows: use click-through
-   (`set_ignore_cursor_events(true)`) over empty regions, enable cursor only on the mascot,
-   or the window swallows desktop clicks.
+   (`set_ignore_cursor_events(true)`) so the overlay never swallows desktop clicks.
+   **v1 decision:** click-through is ON for the whole window, so MASTER_PLAN Phase 4's
+   "hover to keep / click to dismiss" is **disabled** — the mascot auto-hides after ~3.2s.
+   Re-enabling needs per-region hit-testing (toggle ignore-cursor based on pointer position).
+   Tracked for v1.1. The frontend logic is otherwise ready for it.
 6. **Single-instance overlay**: enforce one instance (Tauri single-instance plugin) or two
    copies fight over the port.
 7. **`Notification` over-fires** (also on permission prompts) — debounce, and it bypasses the
