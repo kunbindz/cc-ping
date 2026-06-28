@@ -128,15 +128,16 @@ Build sequentially (per MASTER_PLAN.md). Commit after each phase passes acceptan
 
 | Phase | What | Owner | Status |
 |---|---|---|---|
-| 0 | Repo scaffold + CONTRACT + CLAUDE.md + spike | Claude | ✅ done (this commit) |
-| 1 | Hook MVP: bell + log on Stop | Codex | 🌱 seeded (notify.mjs + read-stdin.mjs work; needs install.mjs + tests) |
-| 2 | Config + threshold + duration | Codex | ⬜ stubs in place |
-| 3 | Overlay skeleton + loopback server + tray | Claude | ✅ code complete (Tauri 2; awaiting a `tauri dev` run on a GUI machine to visually confirm) |
+| 0 | Repo scaffold + CONTRACT + CLAUDE.md + spike | Claude | ✅ done |
+| 1 | Hook MVP: bell + log on Stop | Codex | ✅ done (notify.mjs + install.mjs; 16/16 acceptance tests pass) |
+| 2 | Config + threshold + duration | Codex | ✅ done (config.mjs + duration.mjs; threshold/quietProjects/Notification-bypass verified) |
+| 3 | Overlay skeleton + loopback server + tray | Claude | ✅ code complete (Tauri 2; `cargo check` clean. Needs a `tauri dev` run on a GUI machine to visually confirm) |
 | 4 | Mascot animation + sound | Claude | ✅ code complete (Pip mascot, 3 moods, 3 generated WAVs, burst-coalescing) |
-| 5 | Wire hook → overlay (close the loop) | both | ⬜ — **milestone "complete idea"**; record demo GIF here |
-| 6 | Packaging, install, docs, release CI | Claude | ⬜ not started |
+| 5 | Wire hook → overlay (close the loop) | both | 🔶 **contract-compatible on both sides** (hook POSTs the CONTRACT §2 body to :47321; overlay parses + plays + emits). Needs a live end-to-end run (overlay running + a real Claude task) + demo GIF. |
+| 6 | Packaging, install, docs, release CI | both | 🔶 hook side done (Codex: `cc-ping install`/`uninstall`, idempotent). Remaining (Claude): top-level README, demo GIF, `.github/workflows/release.yml`. |
 
-Phases 1–2 (Codex, hook) and 3–4 (Claude, overlay) run **in parallel** after Phase 0.
+Phases 1–2 (Codex, hook) and 3–4 (Claude, overlay) ran **in parallel** after Phase 0 and are
+both complete. Phase 5 is the only remaining integration step and needs a GUI machine.
 
 ---
 
