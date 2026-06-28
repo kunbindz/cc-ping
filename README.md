@@ -1,8 +1,8 @@
 # cc-ping
 
 > Desktop notification + mascot pop-out for **Claude Code**. When a task finishes — or Claude
-> is waiting for your input — cc-ping rings a terminal bell and a little mascot (**Pip**) runs
-> out from the corner of your desktop to tell you to come back to work.
+> is waiting for your input — cc-ping rings a terminal bell and a little **Chef Crab** mascot
+> runs out from the corner of your desktop to tell you to come back to work.
 
 ## Demo
 
@@ -16,13 +16,13 @@ signal — so you waste time checking back. cc-ping gives you two independent si
 1. **Terminal bell** — always works (tmux/screen/Windows), race-free. This alone is a useful
    install with zero extra apps.
 2. **Mascot + sound** — an optional lightweight background app that plays a sound and animates
-   Pip running out from the corner, showing which project just finished. If it isn't running,
-   you still get the bell.
+   the Chef Crab running out from the corner, showing which project just finished. If it isn't
+   running, you still get the bell.
 
 It distinguishes three situations:
-- **done** — a task/turn finished (cheerful "ting", happy Pip).
-- **waiting** — Claude is waiting for your input/approval (soft tone, Pip peeks).
-- **error** — needs attention (low buzz, worried Pip).
+- **done** — a task/turn finished (cheerful "ting", crab waves a claw).
+- **waiting** — Claude is waiting for your input/approval (soft tone, gentle wave).
+- **error** — needs attention (low buzz, crab trembles).
 
 ## How it works
 
@@ -32,7 +32,7 @@ Claude Code ──Stop/SubagentStop/Notification hook──▶ cc-ping (hook, No
                                                        └─ POST 127.0.0.1:47321/event (fire-and-forget)
                                                                        ▼
                                                           cc-ping-overlay (Tauri, system tray)
-                                                          plays a sound + animates Pip
+                                                          plays a sound + animates the crab
 ```
 
 Architecture and the hook↔overlay protocol are documented in
@@ -54,7 +54,7 @@ Download the build for your OS from the [latest release](../../releases/latest):
 - **Linux:** `.AppImage`
 
 Launch it once; it lives in your system tray (right-click for **Quiet** / **Quit**). It starts
-hidden and only appears when Pip runs out.
+hidden and only appears when the crab runs out.
 
 ## Configure
 
@@ -97,4 +97,4 @@ pnpm overlay:dev      # run the overlay
 ```
 
 ## License
-MIT — see [LICENSE](LICENSE). The **Pip** mascot is original art, not affiliated with Anthropic.
+MIT — see [LICENSE](LICENSE). The **Chef Crab** mascot is original art, not affiliated with Anthropic.

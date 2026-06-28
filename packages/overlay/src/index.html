@@ -9,68 +9,14 @@
   <body>
     <!-- The whole window is transparent + click-through. Only the stage paints. -->
     <div id="stage" class="stage" aria-live="polite">
-      <div id="bubble" class="bubble"><span id="bubble-text"></span></div>
+      <div id="bubble" class="bubble">
+        <span id="bubble-text"></span>
+        <span class="bubble-tail"></span>
+      </div>
 
-      <!-- Pip — original mascot. Moods are driven by a class on this <svg>. -->
-      <svg
-        id="pip"
-        class="pip mood-done"
-        viewBox="0 0 140 168"
-        width="140"
-        height="168"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-label="Pip"
-      >
-        <defs>
-          <radialGradient id="body" cx="42%" cy="34%" r="72%">
-            <stop offset="0%" stop-color="#fff7ee" />
-            <stop offset="100%" stop-color="#f3ddc4" />
-          </radialGradient>
-          <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#00000022" />
-          </filter>
-        </defs>
-
-        <!-- antenna: stem + ping dot (color set per mood via --ping) -->
-        <line x1="70" y1="36" x2="70" y2="14" stroke="#caa97f" stroke-width="4" stroke-linecap="round" />
-        <circle id="ping" cx="70" cy="11" r="9" fill="var(--ping)" />
-        <circle id="ping-ring" cx="70" cy="11" r="9" fill="none" stroke="var(--ping)" stroke-width="2" />
-
-        <!-- feet -->
-        <ellipse cx="54" cy="150" rx="12" ry="8" fill="#e9c79f" />
-        <ellipse cx="86" cy="150" rx="12" ry="8" fill="#e9c79f" />
-
-        <!-- body -->
-        <path
-          filter="url(#soft)"
-          d="M70 36 C104 36 120 62 120 96 C120 132 100 150 70 150 C40 150 20 132 20 96 C20 62 36 36 70 36 Z"
-          fill="url(#body)"
-          stroke="#d9b88c"
-          stroke-width="2"
-        />
-        <ellipse cx="70" cy="110" rx="30" ry="26" fill="#fbe9d4" opacity="0.8" />
-
-        <!-- arms (right arm waves on 'done') -->
-        <path d="M24 100 q-12 6 -14 20" fill="none" stroke="#e0bd92" stroke-width="9" stroke-linecap="round" />
-        <path id="arm" class="arm" d="M116 100 q12 -10 16 -26" fill="none" stroke="#e0bd92" stroke-width="9" stroke-linecap="round" />
-
-        <!-- eyes -->
-        <g id="eyes" class="eyes">
-          <circle cx="55" cy="92" r="6.5" fill="#3b2f2a" />
-          <circle cx="85" cy="92" r="6.5" fill="#3b2f2a" />
-          <circle cx="57" cy="90" r="2" fill="#fff" />
-          <circle cx="87" cy="90" r="2" fill="#fff" />
-        </g>
-
-        <!-- mouths: one shown per mood -->
-        <path class="mouth mouth-happy" d="M58 108 q12 12 24 0" fill="none" stroke="#3b2f2a" stroke-width="4" stroke-linecap="round" />
-        <path class="mouth mouth-soft" d="M59 110 h22" fill="none" stroke="#3b2f2a" stroke-width="4" stroke-linecap="round" />
-        <circle class="mouth mouth-worried" cx="70" cy="112" r="5" fill="none" stroke="#3b2f2a" stroke-width="3.5" />
-
-        <!-- cheeks -->
-        <circle cx="44" cy="104" r="5" fill="#f6b9a0" opacity="0.55" />
-        <circle cx="96" cy="104" r="5" fill="#f6b9a0" opacity="0.55" />
-      </svg>
+      <!-- Chef Crab — pixel-art mascot rendered by mascot.js. The extra top room in the
+           canvas keeps the chef hat from clipping during the hop. -->
+      <canvas id="crab" width="204" height="180"></canvas>
     </div>
 
     <script type="module" src="main.js"></script>

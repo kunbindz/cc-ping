@@ -85,13 +85,13 @@ cc-ping/
 │     │  ├─ Cargo.toml
 │     │  └─ tauri.conf.json   # transparent/alwaysOnTop/skipTaskbar/visible:false window
 │     ├─ src/                 # frontend (plain ES modules — NO build step; uses window.__TAURI__)
-│     │  ├─ index.html        # inline Pip SVG + speech bubble
+│     │  ├─ index.html        # <canvas> for the Chef Crab + speech bubble
 │     │  ├─ main.js           # listen Tauri "cc-ping-event", coalesce bursts, show/hide window
-│     │  ├─ mascot.js         # mood + show↔hide animation state machine
+│     │  ├─ mascot.js         # Chef Crab pixel-art canvas renderer + run/cheer/runout machine
 │     │  └─ styles.css
 │     ├─ assets/
-│     │  ├─ mascot/pip.svg    # original mascot art — codename "Pip" (self-drawn, not Anthropic)
 │     │  └─ sounds/           # ting.wav / soft.wav / buzz.wav (generated, embedded at build)
+│     │  (mascot art lives in src/mascot.js as canvas pixel-art — "Chef Crab", not Anthropic)
 │     └─ package.json
 │
 ├─ assets/
@@ -132,7 +132,7 @@ Build sequentially (per MASTER_PLAN.md). Commit after each phase passes acceptan
 | 1 | Hook MVP: bell + log on Stop | Codex | ✅ done (notify.mjs + install.mjs; 16/16 acceptance tests pass) |
 | 2 | Config + threshold + duration | Codex | ✅ done (config.mjs + duration.mjs; threshold/quietProjects/Notification-bypass verified) |
 | 3 | Overlay skeleton + loopback server + tray | Claude | ✅ code complete (Tauri 2; `cargo check` clean. Needs a `tauri dev` run on a GUI machine to visually confirm) |
-| 4 | Mascot animation + sound | Claude | ✅ code complete (Pip mascot, 3 moods, 3 generated WAVs, burst-coalescing) |
+| 4 | Mascot animation + sound | Claude | ✅ code complete (Chef Crab pixel-art mascot, 3 moods, 3 generated WAVs, burst-coalescing) |
 | 5 | Wire hook → overlay (close the loop) | both | 🔶 **contract-compatible on both sides** (hook POSTs the CONTRACT §2 body to :47321; overlay parses + plays + emits). Needs a live end-to-end run (overlay running + a real Claude task) + demo GIF. |
 | 6 | Packaging, install, docs, release CI | both | 🔶 hook side done (Codex: `cc-ping install`/`uninstall`, idempotent). Remaining (Claude): top-level README, demo GIF, `.github/workflows/release.yml`. |
 

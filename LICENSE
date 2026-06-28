@@ -22,6 +22,7 @@ SOFTWARE.
 
 ---
 
-The mascot artwork in packages/overlay/assets/mascot/ is original work created
-for this project. It is NOT affiliated with, endorsed by, or derived from
-Anthropic's "Claw'd" or any Anthropic trademark or character.
+The mascot artwork (the "Chef Crab" pixel art in
+packages/overlay/src/mascot.js) is original work created for this project. It is
+NOT affiliated with, endorsed by, or derived from Anthropic's "Claw'd" or any
+Anthropic trademark or character.

@@ -12,8 +12,8 @@
       {
         "label": "mascot",
         "title": "cc-ping",
-        "width": 360,
-        "height": 260,
+        "width": 380,
+        "height": 300,
         "resizable": false,
         "decorations": false,
         "transparent": true,

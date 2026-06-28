@@ -1,8 +1,4 @@
 /* cc-ping overlay — transparent window. Only #stage paints; the rest stays see-through. */
-:root {
-  --ping: #14b8a6;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -15,101 +11,62 @@ body {
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Courier New", monospace;
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
 }
 
-/* Stage anchored bottom-right; the mascot enters from the right edge. */
 .stage {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px 6px;
 }
 
-/* ── Speech bubble ── */
+/* Chef Crab canvas — positioned by mascot.js (left/top). 1:1 pixels, no smoothing. */
+#crab {
+  position: absolute;
+  image-rendering: pixelated;
+}
+
+/* ── Speech bubble: centered near the top, revealed during the cheer ── */
 .bubble {
-  max-width: 320px;
-  padding: 9px 14px;
-  border-radius: 14px 14px 4px 14px;
-  background: rgba(28, 25, 23, 0.92);
-  color: #fdf6ec;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.35;
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  max-width: 340px;
+  padding: 12px 18px;
+  background: #fff;
+  border: 4px solid #2a2a2a;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #2a2a2a;
+  text-align: center;
   white-space: nowrap;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
   opacity: 0;
-  transform: translateY(8px) scale(0.96);
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transform: translateX(-50%) translateY(-10px) scale(0.9);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 10;
 }
-.stage.show .bubble {
+.bubble.show {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
-
-/* ── Mascot enter/exit ── */
-.pip {
-  transform: translateX(180%);
-  transition: transform 0.46s cubic-bezier(0.18, 0.7, 0.24, 1);
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.22));
-}
-.stage.show .pip {
-  transform: translateX(0);
-}
-/* little run bob while moving */
-.stage.show .pip {
-  animation: bob 0.42s ease-in-out 2;
-}
-@keyframes bob {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -6px; }
-}
-
-/* ── Moods ── */
-.mouth { display: none; }
-.mood-done { --ping: #14b8a6; }
-.mood-done .mouth-happy { display: block; }
-.mood-waiting { --ping: #3b82f6; }
-.mood-waiting .mouth-soft { display: block; }
-.mood-error { --ping: #f59e0b; }
-.mood-error .mouth-worried { display: block; }
-
-/* ping dot pulse */
-#ping-ring {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: ping 1.4s ease-out infinite;
-}
-@keyframes ping {
-  0% { transform: scale(1); opacity: 0.7; }
-  70%, 100% { transform: scale(2.4); opacity: 0; }
-}
-
-/* arm wave only on 'done' */
-.arm { transform-box: fill-box; transform-origin: 116px 100px; }
-.mood-done.waving .arm { animation: wave 0.4s ease-in-out 3; }
-@keyframes wave {
-  0%, 100% { rotate: 0deg; }
-  50% { rotate: -22deg; }
-}
-
-/* worried mascot trembles slightly */
-.mood-error.waving { animation: shake 0.32s ease-in-out 2; }
-@keyframes shake {
-  0%, 100% { translate: 0 0; }
-  25% { translate: -3px 0; }
-  75% { translate: 3px 0; }
+.bubble-tail {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  margin-left: -11px;
+  width: 0;
+  height: 0;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-top: 15px solid #2a2a2a;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pip, .bubble { transition: opacity 0.2s ease; }
-  .pip { animation: none !important; }
-  #ping-ring, .arm { animation: none !important; }
+  .bubble {
+    transition: opacity 0.2s ease;
+  }
 }

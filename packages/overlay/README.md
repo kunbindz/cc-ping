@@ -2,7 +2,7 @@
 
 The background app half of cc-ping. A lightweight **Tauri** process that lives in the system
 tray, listens on a loopback HTTP port for events from the [hook](../hook/), plays a sound, and
-animates the **Pip** mascot running out from the corner of your desktop.
+animates the **Chef Crab** mascot running out from the corner of your desktop.
 
 Without this app you still get the terminal bell from the hook — the overlay is the richer,
 optional layer.
@@ -19,11 +19,11 @@ See [../../CONTRACT.md](../../CONTRACT.md) (the wire protocol) and [../../CLAUDE
   - `sound.rs` — plays embedded WAV clips with `rodio` (avoids webview autoplay limits).
   - `lib.rs` — single-instance, tray (Quiet/Quit), hidden always-on-top window, positioning.
 - `src/` — frontend (plain ES modules, no build step; uses `window.__TAURI__`):
-  - `index.html` — inline Pip SVG + speech bubble.
-  - `mascot.js` — mood/expression + show↔hide state machine.
+  - `index.html` — `<canvas>` for the Chef Crab + speech bubble.
+  - `mascot.js` — Chef Crab pixel-art renderer + run/cheer/runout state machine.
   - `main.js` — `cc-ping-event` wiring, burst coalescing, OS window show/hide.
 - `assets/sounds/` — `ting.wav` / `soft.wav` / `buzz.wav` (generated, embedded at build time).
-- `assets/mascot/pip.svg` — canonical mascot art (original; not affiliated with Anthropic).
+- The mascot pixel art is defined directly in `src/mascot.js` (original; not affiliated with Anthropic).
 
 ## Develop
 Prereqs: Rust (stable, MSVC toolchain on Windows), the Tauri system deps for your OS
@@ -41,7 +41,7 @@ curl http://127.0.0.1:47321/health
 curl -X POST http://127.0.0.1:47321/event \
   -H 'content-type: application/json' \
   -d '{"type":"done","project":"demo","ts":0}'
-# → ting sound + Pip runs out bottom-right, then hides.
+# → ting sound + the crab runs out bottom-right, then hides.
 # try "type":"waiting" (soft) and "type":"error" (buzz) too.
 ```
 
