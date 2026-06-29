@@ -50,11 +50,11 @@ const clawSmall = [
 
 const HAT_Y = 4, BODY_Y = 9, LEG_Y = 21;
 
-// English by default. Project name (when known) is appended for multi-session context.
+// English by default. Single line — no project name (deliberately kept minimal).
 const MOODS = {
-  done: { text: (p) => (p ? `🍳 Claude finished coding · ${p}` : "🍳 Claude finished coding!") },
-  waiting: { text: (p) => (p ? `🦀 Claude is waiting · ${p}` : "🦀 Claude is waiting for you") },
-  error: { text: (p) => (p ? `🔥 Claude needs attention · ${p}` : "🔥 Claude needs your attention") },
+  done: "🍳 Claude finished cooking!",
+  waiting: "🦀 Claude is waiting for you",
+  error: "🔥 Claude needs your attention",
 };
 
 export class Mascot {
@@ -86,9 +86,9 @@ export class Mascot {
     this.baseTop = Math.max(12, this.ch - this.canvasH - 14);
   }
 
-  setMood(type, project) {
+  setMood(type) {
     this.type = MOODS[type] ? type : "done";
-    this.bubbleText.textContent = MOODS[this.type].text(project);
+    this.bubbleText.textContent = MOODS[this.type];
   }
 
   /** Run in (or reverse a run-out back in). */
