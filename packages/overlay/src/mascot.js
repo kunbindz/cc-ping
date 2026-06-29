@@ -126,6 +126,9 @@ export class Mascot {
   }
 
   _showBubble() {
+    // Sit the bubble just above the crab's head (its tail points down at the crab).
+    const top = Math.max(6, this.baseTop - this.bubble.offsetHeight - 2);
+    this.bubble.style.top = top + "px";
     this.bubble.classList.add("show");
   }
   _hideBubble() {
