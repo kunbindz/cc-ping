@@ -3,7 +3,7 @@
 // held) → runout (back off-screen) → hidden. Sound is played natively by Rust (sound.rs);
 // this module is visuals only. Pixel art adapted from a Claude artifact design.
 
-const PX = 6;
+const PX = 5;
 const COL = {
   ".": null, " ": null,
   D: "#8f3318", M: "#d4622e", L: "#f0915f", S: "#b14a22",
@@ -50,10 +50,11 @@ const clawSmall = [
 
 const HAT_Y = 4, BODY_Y = 9, LEG_Y = 21;
 
+// English by default. Project name (when known) is appended for multi-session context.
 const MOODS = {
-  done: { text: (p) => `🍳 ${p || "Claude"} đã cook xong!` },
-  waiting: { text: (p) => `🦀 ${p || "Claude"} đang đợi bạn` },
-  error: { text: (p) => `🔥 ${p || "Claude"} cần chú ý!` },
+  done: { text: (p) => (p ? `🍳 Claude finished coding · ${p}` : "🍳 Claude finished coding!") },
+  waiting: { text: (p) => (p ? `🦀 Claude is waiting · ${p}` : "🦀 Claude is waiting for you") },
+  error: { text: (p) => (p ? `🔥 Claude needs attention · ${p}` : "🔥 Claude needs your attention") },
 };
 
 export class Mascot {
