@@ -1,12 +1,23 @@
-# cc-ping
+# cc-ping 🦀
 
-> Desktop notification + mascot pop-out for **Claude Code**. When a task finishes — or Claude
-> is waiting for your input — cc-ping rings a terminal bell and a little **Chef Crab** mascot
-> runs out from the corner of your desktop to tell you to come back to work.
+> **A tiny chef crab that tells you when Claude Code is done cooking.**
+>
+> Claude Code runs for minutes, you tab away, and you never know when it's finished. cc-ping
+> rings a terminal bell and a pixel-art crab scuttles out from the corner of your desktop the
+> moment your task is done (or Claude needs you). It's **1.9 MB**, not Electron.
 
-## Demo
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="platforms" />
+  <img src="https://img.shields.io/badge/overlay-1.9%20MB-brightgreen" alt="overlay size" />
+  <img src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB" alt="Tauri 2" />
+</p>
 
-_Demo GIF coming with the first release._
+<p align="center">
+  <!-- ⚠️ Record a 3–5s loop of the crab running out + the "ting" and drop it here as assets/demo.gif.
+       This GIF is the single most important thing for sharing — add it before publishing. -->
+  <img src="assets/demo.gif" alt="cc-ping demo — the chef crab runs out when Claude finishes" width="420" />
+</p>
 
 ## What it does
 
