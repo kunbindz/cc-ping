@@ -4,16 +4,12 @@ import { Mascot } from "./mascot.js";
 
 const HOLD_MS = 3200; // how long the mascot lingers before running out
 const tauri = globalThis.__TAURI__;
-const appWindow = tauri?.window?.getCurrentWindow?.();
 
 let holdTimer = null;
 
-const mascot = new Mascot({
-  onHidden: () => {
-    // Exit animation finished → release the screen.
-    appWindow?.hide?.();
-  },
-});
+// The OS window is shown/hidden by the Rust side (server.rs) — reliably, since it lives in the
+// same handler that plays the sound. The frontend only animates the crab inside that window.
+const mascot = new Mascot({ onHidden: () => {} });
 
 function clearHold() {
   if (holdTimer !== null) {
@@ -30,21 +26,15 @@ function scheduleHide() {
   }, HOLD_MS);
 }
 
-async function handleEvent(payload) {
+function handleEvent(payload) {
   const type = payload?.type || "done";
-  const project = payload?.project || "";
 
-  mascot.setMood(type, project);
+  mascot.setMood(type);
 
+  // Rust has already shown the window; run the crab in (or just update mood on a burst).
   if (!mascot.isVisible()) {
-    // Show the OS window first, then trigger the run-in on the next frame so the
-    // off-screen start state paints before the transition.
-    await appWindow?.show?.();
-    requestAnimationFrame(() => mascot.show());
+    mascot.show();
   }
-  // If already visible (burst within the hold window), we just updated the mood
-  // and reset the timer below — no re-run, so it never jitters.
-
   scheduleHide();
 }
 

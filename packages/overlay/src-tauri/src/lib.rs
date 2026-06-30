@@ -4,7 +4,7 @@ mod config;
 mod server;
 mod sound;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
@@ -67,7 +67,8 @@ pub fn run() {
                     .build(app)?;
 
                 // ── Loopback event server ──
-                server::start(app.handle().clone(), port, quiet.clone());
+                let hide_gen = Arc::new(AtomicU64::new(0));
+                server::start(app.handle().clone(), port, quiet.clone(), hide_gen);
                 Ok(())
             }
         })
