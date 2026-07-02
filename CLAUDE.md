@@ -220,3 +220,4 @@ curl -X POST http://127.0.0.1:47321/event -H 'content-type: application/json' \
 - "What's the next thing to build?" → §5 table here + [MASTER_PLAN.md](MASTER_PLAN.md) phase
 - "What is Codex supposed to do?" → [CODEX_BRIEF.md](CODEX_BRIEF.md)
 - "Is this hook field real?" → §6 here (already verified — don't re-check from memory)
+- "What are we optimizing next / who owns what after v0.1.0?" → [ROADMAP.md](ROADMAP.md)
