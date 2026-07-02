@@ -1,16 +1,18 @@
 // lib.rs — cc-ping overlay app wiring: single-instance, hidden always-on-top window,
 // system tray (Quiet toggle + Quit), and the loopback event server.
 mod config;
+mod hookcfg;
 mod server;
 mod sound;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{
-    menu::{CheckMenuItem, Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Manager, PhysicalPosition,
 };
+use tauri_plugin_autostart::ManagerExt;
 
 /// Position the window in the bottom-right of its current monitor, with a margin.
 fn position_bottom_right(win: &tauri::WebviewWindow) {
@@ -32,6 +34,10 @@ pub fn run() {
     tauri::Builder::default()
         // Single instance: a second launch is a no-op (the first owns the port).
         .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup({
             let quiet = quiet.clone();
             move |app| {
@@ -45,10 +51,30 @@ pub fn run() {
                 }
 
                 // ── System tray ──
+                let enable_item = CheckMenuItem::with_id(
+                    app,
+                    "toggle_enable",
+                    "Enabled in Claude Code",
+                    true,
+                    hookcfg::is_enabled(),
+                    None::<&str>,
+                )?;
+                let startup_item = CheckMenuItem::with_id(
+                    app,
+                    "toggle_startup",
+                    "Start at login",
+                    true,
+                    app.autolaunch().is_enabled().unwrap_or(false),
+                    None::<&str>,
+                )?;
                 let quiet_item =
                     CheckMenuItem::with_id(app, "quiet", "Quiet", true, false, None::<&str>)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&quiet_item, &quit_item])?;
+                let sep = PredefinedMenuItem::separator(app)?;
+                let menu = Menu::with_items(
+                    app,
+                    &[&enable_item, &startup_item, &quiet_item, &sep, &quit_item],
+                )?;
 
                 let quiet_for_menu = quiet.clone();
                 TrayIconBuilder::new()
@@ -61,6 +87,23 @@ pub fn run() {
                             let now = !quiet_for_menu.load(Ordering::Relaxed);
                             quiet_for_menu.store(now, Ordering::Relaxed);
                             let _ = quiet_item.set_checked(now);
+                        }
+                        "toggle_enable" => {
+                            if hookcfg::is_enabled() {
+                                hookcfg::disable();
+                            } else {
+                                hookcfg::enable(app);
+                            }
+                            let _ = enable_item.set_checked(hookcfg::is_enabled());
+                        }
+                        "toggle_startup" => {
+                            let al = app.autolaunch();
+                            if al.is_enabled().unwrap_or(false) {
+                                let _ = al.disable();
+                            } else {
+                                let _ = al.enable();
+                            }
+                            let _ = startup_item.set_checked(al.is_enabled().unwrap_or(false));
                         }
                         _ => {}
                     })
