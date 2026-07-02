@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-// cli.mjs — `cc-ping <command>` dispatcher. STATUS: STUB — Phase 1/6 (Codex).
-//   cc-ping install     → install.mjs (merge hooks into ~/.claude/settings.json)
-//   cc-ping uninstall   → uninstall.mjs (remove only cc-ping's hook entries)
-const cmd = process.argv[2];
+const [cmd] = process.argv.slice(2);
 
 try {
   switch (cmd) {
@@ -12,15 +9,33 @@ try {
     case 'uninstall':
       await import('./uninstall.mjs');
       break;
+    case '--help':
+    case '-h':
+    case undefined:
+      printHelp();
+      process.exit(0);
+      break;
     default:
-      process.stdout.write(
-        'cc-ping — Claude Code task notifier\n\n' +
-          'Usage:\n  cc-ping install     Install the hook into ~/.claude/settings.json\n' +
-          '  cc-ping uninstall   Remove the cc-ping hook\n'
-      );
-      process.exit(cmd ? 1 : 0);
+      process.stderr.write(`Unknown cc-ping command: ${cmd}\n\n`);
+      printHelp();
+      process.exit(1);
   }
 } catch (err) {
   process.stderr.write(`cc-ping ${cmd} failed: ${err?.message ?? err}\n`);
   process.exit(1);
+}
+
+function printHelp() {
+  process.stdout.write(`cc-ping - Claude Code task notifier
+
+Usage:
+  cc-ping install [--notify <path>]     Install hooks into ~/.claude/settings.json
+  cc-ping uninstall [--notify <path>]   Remove cc-ping hooks from settings.json
+
+Options:
+  --notify, --notify-path <path>        Absolute or relative path to notify.mjs
+
+Environment:
+  CC_PING_NOTIFY_PATH                   Alternative way to set the notify.mjs target
+`);
 }

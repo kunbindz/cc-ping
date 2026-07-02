@@ -5,27 +5,40 @@
   "type": "module",
   "main": "./notify.mjs",
   "bin": {
-    "cc-ping": "./cli.mjs"
+    "cc-ping": "cli.mjs"
   },
   "exports": {
     ".": "./notify.mjs"
   },
   "files": [
+    "README.md",
     "notify.mjs",
     "cli.mjs",
     "install.mjs",
     "uninstall.mjs",
-    "lib/"
+    "lib/",
+    "test/"
   ],
   "scripts": {
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "bench": "node test/bench.mjs"
   },
   "keywords": [
     "claude-code",
     "hook",
-    "notification",
+    "claude-code-hooks",
+    "desktop-notification",
     "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kunbindz/cc-ping.git",
+    "directory": "packages/hook"
+  },
+  "bugs": {
+    "url": "https://github.com/kunbindz/cc-ping/issues"
+  },
+  "homepage": "https://github.com/kunbindz/cc-ping#readme",
   "publishConfig": {
     "access": "public"
   },

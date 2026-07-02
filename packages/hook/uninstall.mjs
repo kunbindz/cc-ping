@@ -1,17 +1,23 @@
+#!/usr/bin/env node
 // Remove ONLY cc-ping's hook entries from ~/.claude/settings.json.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  HOOK_EVENTS,
+  defaultNotifyPath,
+  isNotifyHook,
+  readSettings,
+  resolveNotifyPath,
+  settingsPath,
+  writeSettings,
+} from './lib/settings.mjs';
 
-const NOTIFY_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'notify.mjs');
-const HOOK_EVENTS = ['Stop', 'SubagentStop', 'Notification'];
+const DEFAULT_NOTIFY_PATH = defaultNotifyPath(import.meta.url);
 
-export function settingsPath() {
-  return path.join(os.homedir(), '.claude', 'settings.json');
-}
-
-export function uninstall() {
+export function uninstall({ notifyPath = DEFAULT_NOTIFY_PATH } = {}) {
+  const absoluteNotifyPath = resolveNotifyPath({
+    argv: [],
+    env: {},
+    defaultPath: notifyPath,
+  });
   const file = settingsPath();
   const settings = readSettings(file);
 
@@ -26,7 +32,7 @@ export function uninstall() {
           continue;
         }
 
-        const nextHooks = block.hooks.filter((hook) => !isCcPingHook(hook));
+        const nextHooks = block.hooks.filter((hook) => !isNotifyHook(hook, absoluteNotifyPath));
         if (nextHooks.length > 0) {
           keptBlocks.push({ ...block, hooks: nextHooks });
         }
@@ -35,34 +41,19 @@ export function uninstall() {
     }
   }
 
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
-  return file;
-}
-
-function readSettings(file) {
-  try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function isCcPingHook(hook) {
-  return hook?.type === 'command' && commandPointsAtNotify(hook.command);
-}
-
-function commandPointsAtNotify(command) {
-  return (
-    typeof command === 'string' &&
-    (command.includes(NOTIFY_PATH) || command.includes(JSON.stringify(NOTIFY_PATH).slice(1, -1)))
-  );
+  writeSettings(file, settings);
+  return { settingsPath: file, notifyPath: absoluteNotifyPath };
 }
 
 try {
-  const file = uninstall();
-  process.stdout.write(`Removed cc-ping hooks from ${file}\n`);
+  const notifyPath = resolveNotifyPath({
+    argv: process.argv.slice(2),
+    env: process.env,
+    defaultPath: DEFAULT_NOTIFY_PATH,
+  });
+  const result = uninstall({ notifyPath });
+  process.stdout.write(`Removed cc-ping hooks from ${result.settingsPath}\n`);
+  process.stdout.write(`Notify target: ${result.notifyPath}\n`);
 } catch (err) {
   process.stderr.write(`Failed to uninstall cc-ping hooks: ${err?.message ?? err}\n`);
   process.exitCode = 1;

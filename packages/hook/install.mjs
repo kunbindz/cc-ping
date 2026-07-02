@@ -1,64 +1,65 @@
+#!/usr/bin/env node
 // Merge cc-ping hooks into ~/.claude/settings.json. Idempotent and non-destructive.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { detectClaudeCodeVersion } from './lib/version-check.mjs';
+import {
+  HOOK_EVENTS,
+  blockHasNotify,
+  commandForNotify,
+  defaultNotifyPath,
+  readSettings,
+  resolveNotifyPath,
+  settingsPath,
+  writeSettings,
+} from './lib/settings.mjs';
 
-const NOTIFY_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'notify.mjs');
-const HOOK_EVENTS = ['Stop', 'SubagentStop', 'Notification'];
-const COMMAND = `node "${NOTIFY_PATH}"`;
+const DEFAULT_NOTIFY_PATH = defaultNotifyPath(import.meta.url);
 
-export function settingsPath() {
-  return path.join(os.homedir(), '.claude', 'settings.json');
-}
-
-export function install() {
+export function install({ notifyPath = DEFAULT_NOTIFY_PATH, warnVersion = true } = {}) {
+  const absoluteNotifyPath = resolveNotifyPath({
+    argv: [],
+    env: {},
+    defaultPath: notifyPath,
+  });
   const file = settingsPath();
   const settings = readSettings(file);
+  const command = commandForNotify(absoluteNotifyPath);
+
   if (!settings.hooks || typeof settings.hooks !== 'object' || Array.isArray(settings.hooks)) {
     settings.hooks = {};
   }
 
   for (const eventName of HOOK_EVENTS) {
     const blocks = Array.isArray(settings.hooks[eventName]) ? settings.hooks[eventName] : [];
-    if (!blocks.some((block) => blockHasCcPing(block))) {
-      blocks.push({ hooks: [{ type: 'command', command: COMMAND }] });
+    if (!blocks.some((block) => blockHasNotify(block, absoluteNotifyPath))) {
+      blocks.push({ hooks: [{ type: 'command', command }] });
     }
     settings.hooks[eventName] = blocks;
   }
 
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
-  return file;
-}
+  writeSettings(file, settings);
 
-function readSettings(file) {
-  try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
+  if (warnVersion) {
+    const result = detectClaudeCodeVersion();
+    if (result.status === 'old') {
+      process.stderr.write(
+        `cc-ping warning: Claude Code ${result.version} is older than 2.1.141; ` +
+          'terminal bell fallback may require the overlay to be running.\n'
+      );
+    }
   }
-}
 
-function blockHasCcPing(block) {
-  return Array.isArray(block?.hooks) && block.hooks.some(isCcPingHook);
-}
-
-function isCcPingHook(hook) {
-  return hook?.type === 'command' && commandPointsAtNotify(hook.command);
-}
-
-function commandPointsAtNotify(command) {
-  return (
-    typeof command === 'string' &&
-    (command.includes(NOTIFY_PATH) || command.includes(JSON.stringify(NOTIFY_PATH).slice(1, -1)))
-  );
+  return { settingsPath: file, notifyPath: absoluteNotifyPath };
 }
 
 try {
-  const file = install();
-  process.stdout.write(`Installed cc-ping hooks in ${file}\n`);
+  const notifyPath = resolveNotifyPath({
+    argv: process.argv.slice(2),
+    env: process.env,
+    defaultPath: DEFAULT_NOTIFY_PATH,
+  });
+  const result = install({ notifyPath });
+  process.stdout.write(`Installed cc-ping hooks in ${result.settingsPath}\n`);
+  process.stdout.write(`Notify target: ${result.notifyPath}\n`);
 } catch (err) {
   process.stderr.write(`Failed to install cc-ping hooks: ${err?.message ?? err}\n`);
   process.exitCode = 1;

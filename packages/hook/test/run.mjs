@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import {
   mkdtempSync,
   mkdirSync,
+  chmodSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -26,15 +27,17 @@ function tempHome() {
   return dir;
 }
 
-function runNode(args, { stdin = '', home = tempHome(), timeoutMs = 2000 } = {}) {
+function runNode(args, { stdin = '', home = tempHome(), timeoutMs = 2000, env = {} } = {}) {
   return new Promise((resolve) => {
-    const env = {
+    const childEnv = {
       ...process.env,
       HOME: home,
       USERPROFILE: home,
+      ...env,
     };
     const child = spawn(process.execPath, args, {
-      env,
+      cwd: home,
+      env: childEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
@@ -80,6 +83,21 @@ function writeTranscript(home, name, rows) {
   const file = path.join(home, `${name}.jsonl`);
   writeFileSync(file, rows.map((row) => (typeof row === 'string' ? row : JSON.stringify(row))).join('\n'), 'utf8');
   return file;
+}
+
+function writeFakeClaude(home, version) {
+  const bin = path.join(home, 'bin');
+  mkdirSync(bin, { recursive: true });
+
+  const posix = path.join(bin, 'claude');
+  writeFileSync(posix, `#!/bin/sh\necho ${version}\n`, 'utf8');
+  try {
+    chmodSync(posix, 0o755);
+  } catch {}
+
+  const cmd = path.join(bin, 'claude.cmd');
+  writeFileSync(cmd, `@echo off\r\necho ${version}\r\n`, 'utf8');
+  return bin;
 }
 
 async function withServer(handler) {
@@ -129,6 +147,13 @@ try {
   {
     const r = await runNotify('');
     check('empty stdin exits 0 without throwing', r.code === 0);
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { overlay: false });
+    const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Notification"}', { home });
+    const payload = JSON.parse(r.stdout || '{}');
+    check('notify.mjs runs from any working directory', r.code === 0 && payload.terminalSequence === BEL);
   }
   {
     const home = tempHome();
@@ -242,6 +267,37 @@ try {
     const afterStopHooks = after.hooks.Stop.flatMap((block) => block.hooks ?? []);
     check('uninstall succeeds', uninstall.code === 0);
     check('uninstall removes only cc-ping hook entries', afterStopHooks.length === 1 && afterStopHooks[0].command === 'node other.mjs');
+  }
+  {
+    const home = tempHome();
+    const bundledNotify = path.join(home, 'overlay bundle', 'hook', 'notify.mjs');
+    const install = await runNode([CLI, 'install', '--notify', bundledNotify], { home });
+    const settings = parseSettings(home);
+    const stopHooks = settings.hooks.Stop.flatMap((block) => block.hooks ?? []);
+    check('install accepts explicit bundled notify path', install.code === 0 && stopHooks.some((hook) => hook.command?.includes(bundledNotify)));
+
+    const second = await runNode([CLI, 'install', '--notify', bundledNotify], { home });
+    const afterSecond = parseSettings(home);
+    const ccPingHooks = afterSecond.hooks.Stop
+      .flatMap((block) => block.hooks ?? [])
+      .filter((hook) => hook.command?.includes(bundledNotify));
+    check('explicit notify install stays idempotent', second.code === 0 && ccPingHooks.length === 1);
+
+    const uninstall = await runNode([CLI, 'uninstall', '--notify', bundledNotify], { home });
+    const afterUninstall = parseSettings(home);
+    const remaining = afterUninstall.hooks.Stop
+      .flatMap((block) => block.hooks ?? [])
+      .filter((hook) => hook.command?.includes(bundledNotify));
+    check('uninstall accepts explicit bundled notify path', uninstall.code === 0 && remaining.length === 0);
+  }
+  {
+    const home = tempHome();
+    const bin = writeFakeClaude(home, '2.1.140');
+    const r = await runNode([CLI, 'install'], {
+      home,
+      env: { PATH: `${bin}${path.delimiter}${process.env.PATH || ''}` },
+    });
+    check('install warns for Claude Code older than 2.1.141', r.code === 0 && r.stderr.includes('older than 2.1.141'));
   }
 } finally {
   for (const dir of tempRoots) {
