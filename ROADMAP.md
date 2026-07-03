@@ -14,10 +14,14 @@ Legend: 🔴 P0 (do first — adoption) · 🟠 P1 (works for everyone) · 🟡 
 
 ## 🔴 P0 — Remove install friction (biggest lever)
 
-### P0-1 · One-download setup — the overlay installs the hook itself  [Claude + Codex]
+### P0-1 · One-download setup — the overlay installs the hook itself  ✅ DONE
 **Problem:** today it's 2 steps (install app **and** wire the hook via `node install.mjs`), plus
 the overlay must be kept running. Strangers drop off.
 **Target:** download the installer → open → done.
+**Shipped:** overlay bundles `notify.mjs`; tray "Enabled in Claude Code" writes settings.json from
+Rust (`hookcfg.rs`) + "Start at login" (autostart). Hook installer is reusable (`--notify`/env) and
+`notify.mjs` is standalone. (Note: overlay writes settings in Rust rather than shelling `node` — no
+PATH dependency at click time.)
 - **[Claude / overlay]** Bundle the hook (`notify.mjs` + `lib/`) as an app resource. Tray menu:
   **"Enable in Claude Code"** (registers the hook) / **"Disable"**, showing current state; plus
   **"Start at login"** (via `tauri-plugin-autostart`). "Enable" runs the bundled installer so the
@@ -76,24 +80,27 @@ TTS reading the task name · browser extension for claude.ai web · multiple mas
 
 ---
 
-## Codex — your assignment (paste this to Codex)
+## Codex — assignments
 
-You own `packages/hook/`. Read [CONTRACT.md](CONTRACT.md) first. Round-2 tasks, in order:
+You own `packages/hook/`. Read [CONTRACT.md](CONTRACT.md) first. Don't touch `packages/overlay/`.
 
-1. **Make the installer reusable (unblocks P0-1).** Refactor `install.mjs` / `uninstall.mjs` so the
-   target `notify.mjs` path is a parameter (env var or argv), defaulting to the sibling file.
-   Goal: a copy of the hook bundled inside the overlay app can call `node install.mjs` to register
-   **its own** absolute path into `~/.claude/settings.json`. Keep it idempotent, non-destructive,
-   and confirm `notify.mjs` + `lib/*` run from any working directory. Update `test/run.mjs`.
-2. **npm publish (P0-2).** Finalize `package.json` for publish, make `npx cc-ping install|uninstall`
-   clean, write an npm-facing README. Don't publish yourself — the user adds `NPM_TOKEN`; just make
-   `npm publish --dry-run` pass.
-3. **CI guard (tech debt).** In `.github/workflows/release.yml`, make the `publish-hook` job skip (not
-   fail) when `NPM_TOKEN` is absent.
-4. **Version fallback (P1-6, hook side).** If detectable, note when Claude Code < v2.1.141 so users
-   know the bell then only works via the overlay.
-5. **Hook latency benchmark (P2).** Add a small benchmark for the time `notify.mjs` adds to a turn;
-   target < 50 ms; report the number.
+### Round 2 — ✅ DONE
+Reusable installer (`--notify`/env), standalone `notify.mjs`, `version-check.mjs`, CI publish-hook
+guard, npm-ready `package.json`, README, bench, 21/21 tests. Reviewed + merged.
 
-Coordinate on P0-1 with Claude (overlay bundles + invokes your installer). Don't touch
-`packages/overlay/`.
+### Round 3 — current (in order)
+1. **`cc-ping doctor` (diagnostic CLI).** Print a health check: is the hook installed in
+   `~/.claude/settings.json`? is the overlay reachable (`GET http://127.0.0.1:<port>/health` per
+   CONTRACT §2)? Claude Code version (reuse `version-check.mjs`)? is `~/.cc-ping/config.json` valid?
+   Human-readable ✓/✗ lines; exit 0 always. This is the #1 support tool.
+2. **`cc-ping test` (fire a test event).** POST a sample `{type:"done",project:"cc-ping test",ts}`
+   to the overlay (CONTRACT §2) so a user can confirm the crab + sound work **without** waiting for
+   a real task. Print whether the overlay answered. Add `--type done|waiting|error`.
+3. **Finish P0-2 (npm).** Make `npm publish --dry-run` clean: drop `test/` from the published
+   `files` (don't ship tests), verify the tarball contents, confirm `npx cc-ping install|uninstall`
+   works from the packed tarball. Still don't publish — user adds `NPM_TOKEN`.
+4. **README latency honesty (P2).** Reframe the "<50 ms" claim to the measured reality
+   (~90–150 ms, node-startup-bound); put the bench numbers in the hook README.
+
+Coordinate: `doctor`/`test` hit the overlay's HTTP endpoints — follow CONTRACT §2 exactly (loopback
+port from config, `/health` + `/event` shapes). Keep all acceptance tests green.
