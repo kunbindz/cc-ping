@@ -193,8 +193,12 @@ curl -X POST http://127.0.0.1:47321/event -H 'content-type: application/json' \
 2. **Hook never throws, always exit 0.** A non-zero exit interrupts Claude's turn. Every code
    path in the hook is wrapped to swallow errors.
 3. **Overlay binds 127.0.0.1 only**, accepts display data only, executes nothing from the body.
-4. **Audio autoplay**: a webview may block `<audio>` without a user gesture → play sound from
-   the **Rust side (rodio)**, not the frontend. (Overlay implementation note.)
+4. **Rust drives everything except the crab animation.** The webview's `window.__TAURI__.window`
+   API silently no-op'd here (caused the "sound but no crab" bug), and webviews block audio
+   autoplay. So: **sound = Rust (rodio), window show/hide/position = Rust (server.rs on /event +
+   auto-hide, lib.rs positioning), hook install = Rust (hookcfg.rs).** The frontend's ONLY webview
+   dependency is `__TAURI__.event.listen("cc-ping-event")` to animate the crab. Capabilities are
+   therefore event-only — don't add window permissions back expecting the frontend to use them.
 5. **Transparent always-on-top window** on Windows: use click-through
    (`set_ignore_cursor_events(true)`) so the overlay never swallows desktop clicks.
    **v1 decision:** click-through is ON for the whole window, so MASTER_PLAN Phase 4's
