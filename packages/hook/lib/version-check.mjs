@@ -4,13 +4,21 @@ const MIN_VERSION = [2, 1, 141];
 
 export function detectClaudeCodeVersion() {
   try {
-    const output = execFileSync('claude', ['--version'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1000,
-      windowsHide: true,
-      shell: process.platform === 'win32',
-    });
+    const output =
+      process.platform === 'win32'
+        ? execFileSync('claude --version', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 1000,
+            windowsHide: true,
+            shell: true,
+          })
+        : execFileSync('claude', ['--version'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 1000,
+            windowsHide: true,
+          });
     const version = parseVersion(output);
     if (!version) return { status: 'unknown' };
     return compareVersion(version.parts, MIN_VERSION) < 0

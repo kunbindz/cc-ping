@@ -24,6 +24,23 @@ npx cc-ping uninstall
 
 Only cc-ping hook entries are removed.
 
+## Doctor
+
+```sh
+npx cc-ping doctor
+```
+
+Prints support checks for the installed Claude Code hooks, overlay `/health`, Claude Code version, and `~/.cc-ping/config.json`. It always exits `0`.
+
+## Test The Overlay
+
+```sh
+npx cc-ping test
+npx cc-ping test --type waiting
+```
+
+Sends one contract-compatible event to `POST /event` so you can confirm the overlay mascot and sound without waiting for a real Claude Code task. Valid types are `done`, `waiting`, and `error`.
+
 ## Bundled Overlay Installers
 
 The desktop overlay can reuse this installer with an explicit bundled hook path:
@@ -57,4 +74,10 @@ The terminal bell path requires Claude Code `>= 2.1.141`. If an older version is
 
 ## Performance
 
-On the Windows dev machine used for v0.1.0, `npm run bench` measured about `+20ms` median net overhead over Node startup for the overlay-down path.
+This hook is Node-startup-bound. On the Windows dev machine used for v0.1.0, `npm run bench` measured:
+
+- Node startup baseline: median `90.1ms`, p95 `103.7ms`
+- Bell only: median `108.9ms`, p95 `122.9ms`
+- Overlay down: median `110.1ms`, p95 `129.4ms`
+
+The net cc-ping overhead over Node startup was about `+20ms` median, but the user-visible hook process time is realistically around `90-150ms` on that machine.

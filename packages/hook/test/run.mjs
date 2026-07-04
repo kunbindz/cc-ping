@@ -103,6 +103,12 @@ function writeFakeClaude(home, version) {
 async function withServer(handler) {
   const events = [];
   const server = createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, version: '9.9.9-test' }));
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/event') {
       let body = '';
       req.on('data', (chunk) => (body += chunk));
@@ -298,6 +304,55 @@ try {
       env: { PATH: `${bin}${path.delimiter}${process.env.PATH || ''}` },
     });
     check('install warns for Claude Code older than 2.1.141', r.code === 0 && r.stderr.includes('older than 2.1.141'));
+  }
+  {
+    await withServer(async (port) => {
+      const home = tempHome();
+      const bin = writeFakeClaude(home, '2.1.141');
+      writeConfig(home, { overlayPort: port });
+      await runNode([CLI, 'install'], { home });
+      const r = await runNode([CLI, 'doctor'], {
+        home,
+        env: { PATH: `${bin}${path.delimiter}${process.env.PATH || ''}` },
+      });
+      check(
+        'doctor reports installed hook, overlay, version, and config',
+        r.code === 0 &&
+          r.stdout.includes('✓ Claude Code hooks installed') &&
+          r.stdout.includes('✓ Overlay health') &&
+          r.stdout.includes('9.9.9-test') &&
+          r.stdout.includes('✓ Claude Code version') &&
+          r.stdout.includes('✓ Config')
+      );
+    });
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { overlayPort: 'bad' });
+    const r = await runNode([CLI, 'doctor'], { home });
+    check('doctor always exits 0 and flags invalid config', r.code === 0 && r.stdout.includes('✗ Config'));
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { overlayPort: port });
+      const r = await runNode([CLI, 'test', '--type', 'waiting'], { home });
+      check(
+        'cc-ping test posts selected event type',
+        r.code === 0 &&
+          r.stdout.includes('✓ Overlay accepted waiting test event') &&
+          events.length === 1 &&
+          events[0]?.type === 'waiting' &&
+          events[0]?.project === 'cc-ping test' &&
+          Number.isFinite(events[0]?.ts)
+      );
+    });
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { overlayPort: 9 });
+    const r = await runNode([CLI, 'test'], { home });
+    check('cc-ping test reports overlay down without throwing', r.code === 0 && r.stdout.includes('✗ Overlay did not answer'));
   }
 } finally {
   for (const dir of tempRoots) {

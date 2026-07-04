@@ -14,10 +14,11 @@
     "README.md",
     "notify.mjs",
     "cli.mjs",
+    "doctor.mjs",
     "install.mjs",
+    "test-event.mjs",
     "uninstall.mjs",
-    "lib/",
-    "test/"
+    "lib/"
   ],
   "scripts": {
     "test": "node test/run.mjs",
