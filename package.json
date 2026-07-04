@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test:hook": "node packages/hook/test/run.mjs",
+    "test:overlay": "cargo test --manifest-path packages/overlay/src-tauri/Cargo.toml",
     "overlay:dev": "pnpm --filter cc-ping-overlay tauri dev",
     "overlay:build": "pnpm --filter cc-ping-overlay tauri build"
   },

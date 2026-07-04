@@ -77,8 +77,24 @@ fn write_settings(v: &Value) -> bool {
 
 /// Is a cc-ping hook currently registered for any of our events?
 pub fn is_enabled() -> bool {
-    let s = read_settings();
-    let Some(hooks) = s.get("hooks") else { return false };
+    has_our_hook(&read_settings())
+}
+
+/// Register the hook for Stop/SubagentStop/Notification. Idempotent, non-destructive.
+pub fn enable(app: &AppHandle) -> bool {
+    let Some(cmd) = command_for(app) else { return false };
+    write_settings(&add_our_hooks(read_settings(), &cmd))
+}
+
+/// Remove only cc-ping's hook blocks. Leaves other user hooks intact.
+pub fn disable() -> bool {
+    write_settings(&remove_our_hooks(read_settings()))
+}
+
+// ── Pure settings transforms (unit-tested; no IO) ──
+
+fn has_our_hook(settings: &Value) -> bool {
+    let Some(hooks) = settings.get("hooks") else { return false };
     EVENTS.iter().any(|ev| {
         hooks
             .get(*ev)
@@ -88,32 +104,80 @@ pub fn is_enabled() -> bool {
     })
 }
 
-/// Register the hook for Stop/SubagentStop/Notification. Idempotent, non-destructive.
-pub fn enable(app: &AppHandle) -> bool {
-    let Some(cmd) = command_for(app) else { return false };
-    let mut s = read_settings();
-    if !s.get("hooks").map(|h| h.is_object()).unwrap_or(false) {
-        s["hooks"] = json!({});
+fn add_our_hooks(mut settings: Value, cmd: &str) -> Value {
+    if !settings.get("hooks").map(|h| h.is_object()).unwrap_or(false) {
+        settings["hooks"] = json!({});
     }
     for ev in EVENTS {
-        let mut arr = s["hooks"][ev].as_array().cloned().unwrap_or_default();
+        let mut arr = settings["hooks"][ev].as_array().cloned().unwrap_or_default();
         if !arr.iter().any(block_is_ours) {
-            arr.push(json!({ "hooks": [{ "type": "command", "command": cmd.clone() }] }));
+            arr.push(json!({ "hooks": [{ "type": "command", "command": cmd }] }));
         }
-        s["hooks"][ev] = Value::Array(arr);
+        settings["hooks"][ev] = Value::Array(arr);
     }
-    write_settings(&s)
+    settings
 }
 
-/// Remove only cc-ping's hook blocks. Leaves other user hooks intact.
-pub fn disable() -> bool {
-    let mut s = read_settings();
-    if let Some(hooks) = s.get_mut("hooks").and_then(|h| h.as_object_mut()) {
+fn remove_our_hooks(mut settings: Value) -> Value {
+    if let Some(hooks) = settings.get_mut("hooks").and_then(|h| h.as_object_mut()) {
         for ev in EVENTS {
             if let Some(arr) = hooks.get_mut(ev).and_then(|b| b.as_array_mut()) {
                 arr.retain(|block| !block_is_ours(block));
             }
         }
     }
-    write_settings(&s)
+    settings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const CMD: &str = "node \"/x/hook/notify.mjs\"";
+
+    #[test]
+    fn add_to_empty_registers_all_events() {
+        let s = add_our_hooks(json!({}), CMD);
+        for ev in EVENTS {
+            let blocks = s["hooks"][ev].as_array().unwrap();
+            assert_eq!(blocks.len(), 1);
+            assert_eq!(blocks[0]["hooks"][0]["command"], CMD);
+        }
+        assert!(has_our_hook(&s));
+    }
+
+    #[test]
+    fn add_is_idempotent() {
+        let s = add_our_hooks(add_our_hooks(json!({}), CMD), CMD);
+        assert_eq!(s["hooks"]["Stop"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn add_preserves_existing_user_hooks() {
+        let existing =
+            json!({ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "echo hi" }] }] } });
+        let s = add_our_hooks(existing, CMD);
+        let blocks = s["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(blocks.len(), 2);
+        assert!(blocks.iter().any(|b| b["hooks"][0]["command"] == "echo hi"));
+        assert!(blocks.iter().any(block_is_ours));
+    }
+
+    #[test]
+    fn remove_only_removes_ours() {
+        let start =
+            json!({ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "echo hi" }] }] } });
+        let s = remove_our_hooks(add_our_hooks(start, CMD));
+        let blocks = s["hooks"]["Stop"].as_array().unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0]["hooks"][0]["command"], "echo hi");
+        assert!(!has_our_hook(&s));
+    }
+
+    #[test]
+    fn has_our_hook_is_false_when_absent() {
+        assert!(!has_our_hook(&json!({})));
+        assert!(!has_our_hook(&json!({ "hooks": { "Stop": [] } })));
+    }
 }

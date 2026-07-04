@@ -40,3 +40,38 @@ impl Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn cfg(v: serde_json::Value) -> Config {
+        Config(v)
+    }
+
+    #[test]
+    fn port_defaults_and_overrides() {
+        assert_eq!(cfg(json!({})).port(), 47321);
+        assert_eq!(cfg(json!({ "overlayPort": 5000 })).port(), 5000);
+        assert_eq!(cfg(json!(null)).port(), 47321);
+        assert_eq!(cfg(json!({ "overlayPort": "bad" })).port(), 47321);
+    }
+
+    #[test]
+    fn sound_for_defaults() {
+        let c = cfg(json!({}));
+        assert_eq!(c.sound_for("done").as_deref(), Some("ting"));
+        assert_eq!(c.sound_for("waiting").as_deref(), Some("soft"));
+        assert_eq!(c.sound_for("error").as_deref(), Some("buzz"));
+        assert_eq!(c.sound_for("unknown"), None);
+    }
+
+    #[test]
+    fn sound_for_overrides_and_silence() {
+        let c = cfg(json!({ "sounds": { "done": "custom", "waiting": "none" } }));
+        assert_eq!(c.sound_for("done").as_deref(), Some("custom"));
+        assert_eq!(c.sound_for("waiting"), None); // "none" => silent
+        assert_eq!(c.sound_for("error").as_deref(), Some("buzz")); // missing key => default
+    }
+}
