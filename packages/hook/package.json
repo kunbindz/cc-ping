@@ -14,6 +14,7 @@
     "README.md",
     "notify.mjs",
     "cli.mjs",
+    "config-cli.mjs",
     "doctor.mjs",
     "install.mjs",
     "test-event.mjs",
@@ -22,7 +23,8 @@
   ],
   "scripts": {
     "test": "node test/run.mjs",
-    "bench": "node test/bench.mjs"
+    "bench": "node test/bench.mjs",
+    "prepublishOnly": "node test/run.mjs"
   },
   "keywords": [
     "claude-code",

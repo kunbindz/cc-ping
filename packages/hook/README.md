@@ -28,6 +28,7 @@ Only cc-ping hook entries are removed.
 
 ```sh
 npx cc-ping doctor
+npx cc-ping doctor --json
 ```
 
 Prints support checks for the installed Claude Code hooks, overlay `/health`, Claude Code version, and `~/.cc-ping/config.json`. It always exits `0`.
@@ -40,6 +41,24 @@ npx cc-ping test --type waiting
 ```
 
 Sends one contract-compatible event to `POST /event` so you can confirm the overlay mascot and sound without waiting for a real Claude Code task. Valid types are `done`, `waiting`, and `error`.
+
+## Config CLI
+
+```sh
+npx cc-ping config get
+npx cc-ping config get overlayPort
+npx cc-ping config set minDurationMs 5000
+npx cc-ping config set bell false
+npx cc-ping config set quietProjects app-a,app-b
+npx cc-ping config set sounds.error buzz
+npx cc-ping config validate
+```
+
+The config command validates the same schema used by `doctor`, preserves existing unknown keys, and writes pretty JSON.
+
+## Event Types
+
+`Stop` and `SubagentStop` send `done`. Most `Notification` events send `waiting`; `notification_type` values `permission_prompt` and `elicitation_dialog` send `error` because they require attention. Claude Code failure signals such as `StopFailure`, if routed to this hook in the future, also map to `error`.
 
 ## Bundled Overlay Installers
 

@@ -12,9 +12,9 @@ try {
     const { config } = readConfigStatus();
     const result = await postTestEvent(config.overlayPort, type);
     if (result.ok) {
-      process.stdout.write(`✓ Overlay accepted ${type} test event on port ${config.overlayPort}\n`);
+      process.stdout.write(`\u2713 Overlay accepted ${type} test event on port ${config.overlayPort}\n`);
     } else {
-      process.stdout.write(`✗ Overlay did not answer on port ${config.overlayPort}: ${result.detail}\n`);
+      process.stdout.write(`\u2717 Overlay did not answer on port ${config.overlayPort}: ${result.detail}\n`);
     }
   }
 } catch (err) {

@@ -15,6 +15,9 @@ try {
     case 'test':
       await import('./test-event.mjs');
       break;
+    case 'config':
+      await import('./config-cli.mjs');
+      break;
     case '--help':
     case '-h':
     case undefined:
@@ -40,10 +43,12 @@ Usage:
   cc-ping doctor                        Print hook, overlay, Claude, and config health
   cc-ping test [--type done|waiting|error]
                                         Send a test event to the overlay
+  cc-ping config get|set|validate       Read or update ~/.cc-ping/config.json
 
 Options:
   --notify, --notify-path <path>        Absolute or relative path to notify.mjs
   --type done|waiting|error             Event type for cc-ping test
+  --json                                Machine-readable output for cc-ping doctor
 
 Environment:
   CC_PING_NOTIFY_PATH                   Alternative way to set the notify.mjs target

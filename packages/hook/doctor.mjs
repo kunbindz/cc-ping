@@ -3,18 +3,45 @@ import { readConfigStatus } from './lib/config.mjs';
 import { detectClaudeCodeVersion } from './lib/version-check.mjs';
 import { HOOK_EVENTS, readSettings, settingsPath } from './lib/settings.mjs';
 
+const json = process.argv.includes('--json');
+
 try {
   const config = readConfigStatus();
   const hook = checkHookInstalled();
   const overlay = await checkOverlay(config.config.overlayPort);
   const version = detectClaudeCodeVersion();
+  const checks = {
+    hook,
+    overlay,
+    claudeCode: {
+      ok: version.status === 'ok',
+      status: version.status,
+      version: version.version ?? null,
+      detail: formatVersion(version),
+    },
+    config: {
+      ok: config.ok,
+      exists: config.exists,
+      path: config.path,
+      detail: formatConfig(config),
+      issues: config.issues,
+    },
+  };
 
-  line(hook.ok, `Claude Code hooks ${hook.ok ? 'installed' : 'not installed'}`, hook.detail);
-  line(overlay.ok, `Overlay health http://127.0.0.1:${config.config.overlayPort}/health`, overlay.detail);
-  line(version.status === 'ok', 'Claude Code version', formatVersion(version));
-  line(config.ok, config.exists ? `Config ${config.path}` : `Config ${config.path}`, formatConfig(config));
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ ok: Object.values(checks).every((check) => check.ok), checks }, null, 2)}\n`);
+  } else {
+    line(checks.hook.ok, `Claude Code hooks ${checks.hook.ok ? 'installed' : 'not installed'}`, checks.hook.detail);
+    line(checks.overlay.ok, `Overlay health http://127.0.0.1:${config.config.overlayPort}/health`, checks.overlay.detail);
+    line(checks.claudeCode.ok, 'Claude Code version', checks.claudeCode.detail);
+    line(checks.config.ok, `Config ${checks.config.path}`, checks.config.detail);
+  }
 } catch (err) {
-  line(false, 'cc-ping doctor failed', err?.message ?? String(err));
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ ok: false, error: err?.message ?? String(err) }, null, 2)}\n`);
+  } else {
+    line(false, 'cc-ping doctor failed', err?.message ?? String(err));
+  }
 } finally {
   process.exitCode = 0;
 }
@@ -28,6 +55,8 @@ function checkHookInstalled() {
   const missing = HOOK_EVENTS.filter((eventName) => !eventHasNotifyHook(hooks[eventName]));
   return {
     ok: missing.length === 0,
+    path: file,
+    missing,
     detail: missing.length === 0 ? file : `${file}; missing ${missing.join(', ')}`,
   };
 }
@@ -53,9 +82,21 @@ async function checkOverlay(port) {
       body = await res.json();
     } catch {}
     const ok = res.status === 200 && body?.ok === true;
-    return { ok, detail: ok ? `ok${body?.version ? `, version ${body.version}` : ''}` : `HTTP ${res.status}` };
+    return {
+      ok,
+      port,
+      status: res.status,
+      version: body?.version ?? null,
+      detail: ok ? `ok${body?.version ? `, version ${body.version}` : ''}` : `HTTP ${res.status}`,
+    };
   } catch (err) {
-    return { ok: false, detail: err?.name === 'AbortError' ? 'timeout' : 'not reachable' };
+    return {
+      ok: false,
+      port,
+      status: null,
+      version: null,
+      detail: err?.name === 'AbortError' ? 'timeout' : 'not reachable',
+    };
   }
 }
 
@@ -72,5 +113,5 @@ function formatConfig(config) {
 }
 
 function line(ok, label, detail) {
-  process.stdout.write(`${ok ? '✓' : '✗'} ${label}${detail ? ` - ${detail}` : ''}\n`);
+  process.stdout.write(`${ok ? '\u2713' : '\u2717'} ${label}${detail ? ` - ${detail}` : ''}\n`);
 }

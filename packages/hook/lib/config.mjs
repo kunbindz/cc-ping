@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -11,6 +11,8 @@ export const DEFAULT_CONFIG = {
   quietProjects: [],
 };
 
+export const CONFIG_KEYS = ['minDurationMs', 'bell', 'overlay', 'overlayPort', 'sounds', 'quietProjects'];
+
 export function configPath() {
   return path.join(os.homedir(), '.cc-ping', 'config.json');
 }
@@ -18,18 +20,19 @@ export function configPath() {
 export function readConfigStatus(file = configPath()) {
   try {
     if (!existsSync(file)) {
-      return { ok: true, exists: false, path: file, config: cloneDefaultConfig(), issues: [] };
+      return {
+        ok: true,
+        exists: false,
+        path: file,
+        raw: {},
+        config: cloneDefaultConfig(),
+        issues: [],
+      };
     }
 
     const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {
-        ok: false,
-        exists: true,
-        path: file,
-        config: cloneDefaultConfig(),
-        issues: ['config root must be an object'],
-      };
+    if (!isPlainObject(parsed)) {
+      return invalid(file, parsed, ['config root must be an object']);
     }
 
     const issues = validateConfig(parsed);
@@ -37,6 +40,7 @@ export function readConfigStatus(file = configPath()) {
       ok: issues.length === 0,
       exists: true,
       path: file,
+      raw: parsed,
       config: mergeConfig(parsed),
       issues,
     };
@@ -45,14 +49,17 @@ export function readConfigStatus(file = configPath()) {
       ok: false,
       exists: true,
       path: file,
+      raw: null,
       config: cloneDefaultConfig(),
       issues: [err?.message ?? 'failed to read config'],
     };
   }
 }
 
-function validateConfig(value) {
+export function validateConfig(value) {
   const issues = [];
+  if (!isPlainObject(value)) return ['config root must be an object'];
+
   if ('minDurationMs' in value && !Number.isFinite(value.minDurationMs)) {
     issues.push('minDurationMs must be a number');
   }
@@ -68,24 +75,37 @@ function validateConfig(value) {
   ) {
     issues.push('overlayPort must be a number from 1 to 65535');
   }
-  if ('sounds' in value && (!value.sounds || typeof value.sounds !== 'object' || Array.isArray(value.sounds))) {
-    issues.push('sounds must be an object');
+  if ('sounds' in value) {
+    if (!isPlainObject(value.sounds)) {
+      issues.push('sounds must be an object');
+    } else {
+      for (const key of ['done', 'waiting', 'error']) {
+        if (key in value.sounds && !isSoundValue(value.sounds[key])) {
+          issues.push(`sounds.${key} must be a string, null, or false`);
+        }
+      }
+    }
   }
-  if ('quietProjects' in value && (!Array.isArray(value.quietProjects) || value.quietProjects.some((item) => typeof item !== 'string'))) {
+  if (
+    'quietProjects' in value &&
+    (!Array.isArray(value.quietProjects) || value.quietProjects.some((item) => typeof item !== 'string'))
+  ) {
     issues.push('quietProjects must be a string array');
   }
   return issues;
 }
 
-function mergeConfig(value) {
+export function mergeConfig(value) {
   const cfg = cloneDefaultConfig();
+  if (!isPlainObject(value)) return cfg;
+
   if (Number.isFinite(value.minDurationMs)) cfg.minDurationMs = Math.max(0, value.minDurationMs);
   if (typeof value.bell === 'boolean') cfg.bell = value.bell;
   if (typeof value.overlay === 'boolean') cfg.overlay = value.overlay;
   if (Number.isFinite(value.overlayPort) && value.overlayPort > 0 && value.overlayPort <= 65535) {
     cfg.overlayPort = value.overlayPort;
   }
-  if (value.sounds && typeof value.sounds === 'object' && !Array.isArray(value.sounds)) {
+  if (isPlainObject(value.sounds)) {
     cfg.sounds = { ...cfg.sounds, ...value.sounds };
   }
   if (Array.isArray(value.quietProjects)) {
@@ -94,10 +114,81 @@ function mergeConfig(value) {
   return cfg;
 }
 
+export function writeConfig(value, file = configPath()) {
+  const issues = validateConfig(value);
+  if (issues.length > 0) {
+    throw new Error(issues.join('; '));
+  }
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+export function parseConfigValue(key, rawValue) {
+  if (key === 'minDurationMs' || key === 'overlayPort') {
+    const number = Number(rawValue);
+    if (!Number.isFinite(number)) throw new Error(`${key} must be a number`);
+    return number;
+  }
+  if (key === 'bell' || key === 'overlay') {
+    if (rawValue === 'true') return true;
+    if (rawValue === 'false') return false;
+    throw new Error(`${key} must be true or false`);
+  }
+  if (key === 'quietProjects') {
+    if (!rawValue) return [];
+    return rawValue.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  if (key === 'sounds') {
+    const parsed = JSON.parse(rawValue);
+    if (!isPlainObject(parsed)) throw new Error('sounds must be a JSON object');
+    return parsed;
+  }
+  if (key.startsWith('sounds.')) {
+    const soundKey = key.slice('sounds.'.length);
+    if (!['done', 'waiting', 'error'].includes(soundKey)) {
+      throw new Error('sounds key must be done, waiting, or error');
+    }
+    if (rawValue === 'null') return null;
+    if (rawValue === 'false') return false;
+    return rawValue;
+  }
+  throw new Error(`unknown config key: ${key}`);
+}
+
+export function setConfigValue(config, key, value) {
+  const next = isPlainObject(config) ? { ...config } : {};
+  if (key.startsWith('sounds.')) {
+    const soundKey = key.slice('sounds.'.length);
+    next.sounds = isPlainObject(next.sounds) ? { ...next.sounds, [soundKey]: value } : { [soundKey]: value };
+  } else {
+    next[key] = value;
+  }
+  return next;
+}
+
+function invalid(file, raw, issues) {
+  return {
+    ok: false,
+    exists: true,
+    path: file,
+    raw,
+    config: cloneDefaultConfig(),
+    issues,
+  };
+}
+
 function cloneDefaultConfig() {
   return {
     ...DEFAULT_CONFIG,
     sounds: { ...DEFAULT_CONFIG.sounds },
     quietProjects: [...DEFAULT_CONFIG.quietProjects],
   };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSoundValue(value) {
+  return typeof value === 'string' || value == null || value === false;
 }

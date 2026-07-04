@@ -17,6 +17,8 @@ const HOOK_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const NOTIFY = path.join(HOOK_DIR, 'notify.mjs');
 const CLI = path.join(HOOK_DIR, 'cli.mjs');
 const BEL = '\u0007';
+const CHECK = '\u2713';
+const CROSS = '\u2717';
 
 let failures = 0;
 const tempRoots = [];
@@ -202,6 +204,33 @@ try {
     check('Notification bypasses duration threshold', r.code === 0 && payload.terminalSequence === BEL);
   }
   {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { minDurationMs: 999999, overlayPort: port });
+      // A permission prompt is an error-mood Notification; it must alert even with a tiny
+      // duration well below the threshold (attention can't be silenced).
+      const transcript = writeTranscript(home, 'perm', [
+        { type: 'user', timestamp: 1000 },
+        { type: 'assistant', timestamp: 1100 },
+      ]);
+      const r = await runNotify(
+        JSON.stringify({
+          cwd: '/tmp/foo',
+          hook_event_name: 'Notification',
+          notification_type: 'permission_prompt',
+          transcript_path: transcript,
+        }),
+        { home }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const payload = JSON.parse(r.stdout || '{}');
+      check(
+        'permission_prompt alerts as error and bypasses threshold',
+        r.code === 0 && payload.terminalSequence === BEL && events[0]?.type === 'error'
+      );
+    });
+  }
+  {
     const home = tempHome();
     writeConfig(home, { bell: false, overlay: false });
     const r = await runNotify('{"cwd":"/tmp/foo","hook_event_name":"Stop"}', { home });
@@ -235,6 +264,25 @@ try {
           events[0]?.sessionId === 'abc123' &&
           events[0]?.agentType === 'reviewer' &&
           events[0]?.durationMs === 12000
+      );
+    });
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { bell: false, overlay: true, overlayPort: port });
+      const r = await runNotify(
+        JSON.stringify({
+          cwd: '/tmp/foo',
+          hook_event_name: 'Notification',
+          notification_type: 'permission_prompt',
+        }),
+        { home }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      check(
+        'Notification permission_prompt maps to error mood',
+        r.code === 0 && events.length === 1 && events[0]?.type === 'error'
       );
     });
   }
@@ -318,11 +366,20 @@ try {
       check(
         'doctor reports installed hook, overlay, version, and config',
         r.code === 0 &&
-          r.stdout.includes('✓ Claude Code hooks installed') &&
-          r.stdout.includes('✓ Overlay health') &&
+          r.stdout.includes(`${CHECK} Claude Code hooks installed`) &&
+          r.stdout.includes(`${CHECK} Overlay health`) &&
           r.stdout.includes('9.9.9-test') &&
-          r.stdout.includes('✓ Claude Code version') &&
-          r.stdout.includes('✓ Config')
+          r.stdout.includes(`${CHECK} Claude Code version`) &&
+          r.stdout.includes(`${CHECK} Config`)
+      );
+      const json = await runNode([CLI, 'doctor', '--json'], {
+        home,
+        env: { PATH: `${bin}${path.delimiter}${process.env.PATH || ''}` },
+      });
+      const parsed = JSON.parse(json.stdout);
+      check(
+        'doctor --json returns machine-readable status',
+        json.code === 0 && parsed.ok === true && parsed.checks.overlay.version === '9.9.9-test'
       );
     });
   }
@@ -330,7 +387,7 @@ try {
     const home = tempHome();
     writeConfig(home, { overlayPort: 'bad' });
     const r = await runNode([CLI, 'doctor'], { home });
-    check('doctor always exits 0 and flags invalid config', r.code === 0 && r.stdout.includes('✗ Config'));
+    check('doctor always exits 0 and flags invalid config', r.code === 0 && r.stdout.includes(`${CROSS} Config`));
   }
   {
     await withServer(async (port, events) => {
@@ -340,7 +397,7 @@ try {
       check(
         'cc-ping test posts selected event type',
         r.code === 0 &&
-          r.stdout.includes('✓ Overlay accepted waiting test event') &&
+          r.stdout.includes(`${CHECK} Overlay accepted waiting test event`) &&
           events.length === 1 &&
           events[0]?.type === 'waiting' &&
           events[0]?.project === 'cc-ping test' &&
@@ -352,7 +409,34 @@ try {
     const home = tempHome();
     writeConfig(home, { overlayPort: 9 });
     const r = await runNode([CLI, 'test'], { home });
-    check('cc-ping test reports overlay down without throwing', r.code === 0 && r.stdout.includes('✗ Overlay did not answer'));
+    check('cc-ping test reports overlay down without throwing', r.code === 0 && r.stdout.includes(`${CROSS} Overlay did not answer`));
+  }
+  {
+    const home = tempHome();
+    const setDuration = await runNode([CLI, 'config', 'set', 'minDurationMs', '5000'], { home });
+    const setQuiet = await runNode([CLI, 'config', 'set', 'quietProjects', 'app-a,app-b'], { home });
+    const setSound = await runNode([CLI, 'config', 'set', 'sounds.error', 'buzz'], { home });
+    const get = await runNode([CLI, 'config', 'get'], { home });
+    const config = JSON.parse(get.stdout);
+    check(
+      'config set/get writes pretty valid config',
+      setDuration.code === 0 &&
+        setQuiet.code === 0 &&
+        setSound.code === 0 &&
+        get.code === 0 &&
+        config.minDurationMs === 5000 &&
+        config.quietProjects.length === 2 &&
+        config.sounds.error === 'buzz'
+    );
+    const validate = await runNode([CLI, 'config', 'validate'], { home });
+    check('config validate accepts valid config', validate.code === 0 && validate.stdout.includes('valid'));
+  }
+  {
+    const home = tempHome();
+    writeConfig(home, { overlayPort: 'bad' });
+    const set = await runNode([CLI, 'config', 'set', 'bell', 'false'], { home });
+    const saved = JSON.parse(readFileSync(path.join(home, '.cc-ping', 'config.json'), 'utf8'));
+    check('config set refuses to overwrite invalid config', set.code === 1 && saved.overlayPort === 'bad');
   }
 } finally {
   for (const dir of tempRoots) {

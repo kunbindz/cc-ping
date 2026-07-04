@@ -10,7 +10,12 @@ const EVENT_TYPE = {
   Stop: 'done',
   SubagentStop: 'done',
   Notification: 'waiting',
+  StopFailure: 'error',
 };
+
+// Claude Code Notification carries notification_type. Permission/elicitation prompts
+// need attention, so they use the overlay's error mood; idle/auth notifications wait.
+const ERROR_NOTIFICATION_TYPES = new Set(['permission_prompt', 'elicitation_dialog']);
 
 const DEFAULT_CONFIG = {
   minDurationMs: 10000,
@@ -31,15 +36,17 @@ try {
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
   const project = path.basename(cwd) || '';
   const eventName = typeof input.hook_event_name === 'string' ? input.hook_event_name : 'Stop';
-  const type = EVENT_TYPE[eventName] || 'done';
+  const type = eventType(input, eventName);
   const config = loadConfig();
-  const durationMs = type === 'waiting' ? null : estimateDurationMs(input.transcript_path);
+  // Only 'done' (Stop/SubagentStop) is subject to the min-duration threshold. 'waiting' and
+  // 'error' come from Notifications ("Claude needs you now") and must always alert.
+  const durationMs = type === 'done' ? estimateDurationMs(input.transcript_path) : null;
 
   if (config.quietProjects.includes(project)) {
     process.exit(0);
   }
 
-  if (type !== 'waiting' && durationMs != null && durationMs < config.minDurationMs) {
+  if (type === 'done' && durationMs != null && durationMs < config.minDurationMs) {
     process.exit(0);
   }
 
@@ -76,6 +83,13 @@ function readStdin() {
   } catch {
     return {};
   }
+}
+
+function eventType(input, eventName) {
+  if (eventName === 'Notification') {
+    return ERROR_NOTIFICATION_TYPES.has(input.notification_type) ? 'error' : 'waiting';
+  }
+  return EVENT_TYPE[eventName] || 'done';
 }
 
 function loadConfig() {
