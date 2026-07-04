@@ -96,6 +96,12 @@ Then quit the overlay from its tray icon and delete the app.
   bell only works through the overlay.
 - **Node ≥ 18** (ships with Claude Code environments) for the hook.
 
+## Platform support
+- **Windows** — tested end-to-end.
+- **macOS / Linux** — built (macOS `.dmg` is universal: Intel + Apple Silicon) and unit-tested in
+  CI on every push, but the GUI runtime (mascot window, transparency, sound) hasn't been human-
+  verified yet. Feedback from Mac/Linux users very welcome — please open an issue.
+
 ## Develop
 This is a pnpm workspace with two packages: `packages/hook` (Node) and `packages/overlay`
 (Tauri). See [CLAUDE.md](CLAUDE.md) for the map and [packages/overlay/README.md](packages/overlay/README.md)
