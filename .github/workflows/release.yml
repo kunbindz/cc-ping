@@ -16,7 +16,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest, macos-latest, ubuntu-22.04]
+        include:
+          - platform: windows-latest
+            args: ""
+            rust-targets: ""
+          - platform: ubuntu-22.04
+            args: ""
+            rust-targets: ""
+          # Universal binary so the .dmg runs on both Apple Silicon and Intel Macs.
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +44,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
 
       - name: Cache cargo
         uses: swatinem/rust-cache@v2
@@ -67,6 +79,7 @@ jobs:
           releaseBody: "See the README for install instructions."
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
 
   publish-hook:
     name: publish hook to npm
