@@ -88,19 +88,27 @@ You own `packages/hook/`. Read [CONTRACT.md](CONTRACT.md) first. Don't touch `pa
 Reusable installer (`--notify`/env), standalone `notify.mjs`, `version-check.mjs`, CI publish-hook
 guard, npm-ready `package.json`, README, bench, 21/21 tests. Reviewed + merged.
 
-### Round 3 — current (in order)
-1. **`cc-ping doctor` (diagnostic CLI).** Print a health check: is the hook installed in
-   `~/.claude/settings.json`? is the overlay reachable (`GET http://127.0.0.1:<port>/health` per
-   CONTRACT §2)? Claude Code version (reuse `version-check.mjs`)? is `~/.cc-ping/config.json` valid?
-   Human-readable ✓/✗ lines; exit 0 always. This is the #1 support tool.
-2. **`cc-ping test` (fire a test event).** POST a sample `{type:"done",project:"cc-ping test",ts}`
-   to the overlay (CONTRACT §2) so a user can confirm the crab + sound work **without** waiting for
-   a real task. Print whether the overlay answered. Add `--type done|waiting|error`.
-3. **Finish P0-2 (npm).** Make `npm publish --dry-run` clean: drop `test/` from the published
-   `files` (don't ship tests), verify the tarball contents, confirm `npx cc-ping install|uninstall`
-   works from the packed tarball. Still don't publish — user adds `NPM_TOKEN`.
-4. **README latency honesty (P2).** Reframe the "<50 ms" claim to the measured reality
-   (~90–150 ms, node-startup-bound); put the bench numbers in the hook README.
+### Round 3 — ✅ DONE
+`cc-ping doctor` + `cc-ping test` CLIs, `lib/config.mjs` validation, npm tarball cleaned
+(`--dry-run` green, no `test/`), README latency reframed. Reviewed + merged.
 
-Coordinate: `doctor`/`test` hit the overlay's HTTP endpoints — follow CONTRACT §2 exactly (loopback
-port from config, `/health` + `/event` shapes). Keep all acceptance tests green.
+### Round 4 — current (in order)
+1. **CI test job.** Add `.github/workflows/ci.yml` that runs the hook acceptance tests
+   (`node packages/hook/test/run.mjs`) on push + PR (Node 20, ubuntu). Fast guard so hook
+   regressions are caught without waiting for a tag/release. (Don't run the overlay build here —
+   that's tag-only in release.yml; Claude owns overlay CI.)
+2. **`error` mood — actually fire it.** Today only `done`/`waiting` are produced. Investigate the
+   `Notification` hook payload (does stdin carry a `message`/type that distinguishes "needs
+   attention / permission / failure" from plain idle "waiting"?). If yes, map that to `type:"error"`
+   so the crab shows the worried pose + buzz. If the payload can't distinguish it, document why and
+   leave `error` for a future Claude Code signal. Keep the hot path fast + exit-0.
+3. **`cc-ping config` command.** Get/set/validate `~/.cc-ping/config.json`
+   (`minDurationMs`, `bell`, `overlay`, `overlayPort`, `sounds`, `quietProjects`) with the same
+   validation as `lib/config.mjs`. e.g. `cc-ping config get`, `cc-ping config set minDurationMs 5000`,
+   `cc-ping config set quietProjects a,b`. Never corrupt an existing config; write pretty JSON.
+4. **Polish (if time).** `doctor --json` (machine-readable), and a `prepublishOnly` script that runs
+   the tests so a broken hook can't be published.
+
+Coordinate: anything touching the overlay's HTTP endpoints follows CONTRACT §2. The `error` type
+must match the overlay's mood keys (`done|waiting|error`). Keep all acceptance tests green; don't
+touch `packages/overlay/`.
