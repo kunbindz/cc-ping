@@ -83,7 +83,11 @@ function readKey(config, key) {
 }
 
 function isKnownKey(key) {
-  return CONFIG_KEYS.includes(key) || ['sounds.done', 'sounds.waiting', 'sounds.error'].includes(key);
+  return (
+    CONFIG_KEYS.includes(key) ||
+    ['sounds.done', 'sounds.waiting', 'sounds.error'].includes(key) ||
+    ['summary.mode', 'summary.baseUrl', 'summary.model', 'summary.apiKeyEnv'].includes(key)
+  );
 }
 
 function usage(code, message) {
@@ -94,12 +98,15 @@ function usage(code, message) {
   cc-ping config validate
 
 Keys:
-  minDurationMs, bell, overlay, overlayPort, quietProjects, sounds, sounds.done, sounds.waiting, sounds.error
+  minDurationMs, bell, overlay, overlayPort, quietProjects
+  sounds, sounds.done, sounds.waiting, sounds.error
+  summary, summary.mode, summary.baseUrl, summary.model, summary.apiKeyEnv
 
 Examples:
   cc-ping config set minDurationMs 5000
   cc-ping config set quietProjects app-a,app-b
   cc-ping config set sounds.error buzz
+  cc-ping config set summary.mode off
 `);
   process.exit(code);
 }

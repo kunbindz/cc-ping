@@ -87,6 +87,20 @@ function writeTranscript(home, name, rows) {
   return file;
 }
 
+function writeHugeTranscript(home) {
+  const file = path.join(home, 'huge.jsonl');
+  const filler = [];
+  for (let i = 0; i < 12000; i += 1) {
+    filler.push(JSON.stringify({ type: 'assistant', timestamp: i, message: { role: 'assistant', content: 'x'.repeat(80) } }));
+  }
+  filler.push(JSON.stringify({ type: 'user', timestamp: 20_000, message: { role: 'user', content: 'please finish' } }));
+  filler.push(JSON.stringify({ type: 'assistant', timestamp: 21_000, message: { role: 'assistant', content: [
+    { type: 'tool_use', name: 'Edit', input: { file_path: 'tail.js' } },
+  ] } }));
+  writeFileSync(file, `${filler.join('\n')}\n`, 'utf8');
+  return file;
+}
+
 function writeFakeClaude(home, version) {
   const bin = path.join(home, 'bin');
   mkdirSync(bin, { recursive: true });
@@ -239,7 +253,7 @@ try {
   {
     await withServer(async (port, events) => {
       const home = tempHome();
-      writeConfig(home, { bell: false, overlay: true, overlayPort: port });
+      writeConfig(home, { minDurationMs: 0, bell: false, overlay: true, overlayPort: port });
       const transcript = writeTranscript(home, 'post', [
         'malformed',
         { type: 'user', timestamp: 1000 },
@@ -264,6 +278,53 @@ try {
           events[0]?.sessionId === 'abc123' &&
           events[0]?.agentType === 'reviewer' &&
           events[0]?.durationMs === 12000
+      );
+    });
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { minDurationMs: 0, bell: false, overlay: true, overlayPort: port });
+      const transcript = writeTranscript(home, 'summary', [
+        { type: 'user', timestamp: 1000, message: { role: 'user', content: 'do the task' } },
+        { type: 'assistant', timestamp: 1001, message: { role: 'assistant', content: [
+          { type: 'tool_use', name: 'Edit', input: { file_path: 'a.js' } },
+          { type: 'tool_use', name: 'Write', input: { file_path: 'b.js' } },
+          { type: 'tool_use', name: 'apply_patch', input: { file_path: 'c.js' } },
+          { type: 'tool_use', name: 'shell_command', input: { command: 'pnpm test' } },
+          { type: 'tool_use', name: 'shell_command', input: { command: 'git commit -m one && git commit -m two' } },
+        ] } },
+      ]);
+      const r = await runNotify(JSON.stringify({ cwd: '/tmp/foo', hook_event_name: 'Stop', transcript_path: transcript }), { home });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      check(
+        'done event includes heuristic transcript summary',
+        r.code === 0 && events[0]?.summary === 'edited 3 files · ran tests · 2 commits'
+      );
+    });
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { minDurationMs: 0, bell: false, overlay: true, overlayPort: port });
+      const transcript = writeTranscript(home, 'bad-summary', ['not json', { type: 'assistant', timestamp: 1000 }]);
+      const r = await runNotify(JSON.stringify({ cwd: '/tmp/foo', hook_event_name: 'Stop', transcript_path: transcript }), { home });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      check('uncertain transcript summary is null', r.code === 0 && events[0]?.summary === null);
+    });
+  }
+  {
+    await withServer(async (port, events) => {
+      const home = tempHome();
+      writeConfig(home, { bell: false, overlay: true, overlayPort: port });
+      const transcript = writeHugeTranscript(home);
+      const started = Date.now();
+      const r = await runNotify(JSON.stringify({ cwd: '/tmp/foo', hook_event_name: 'Stop', transcript_path: transcript }), { home });
+      const elapsed = Date.now() - started;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      check(
+        'huge transcript summary uses bounded tail read',
+        r.code === 0 && elapsed < 1000 && events[0]?.summary === 'edited 1 file'
       );
     });
   }

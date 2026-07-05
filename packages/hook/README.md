@@ -51,6 +51,11 @@ npx cc-ping config set minDurationMs 5000
 npx cc-ping config set bell false
 npx cc-ping config set quietProjects app-a,app-b
 npx cc-ping config set sounds.error buzz
+npx cc-ping config set summary.mode off
+npx cc-ping config set summary.mode llm
+npx cc-ping config set summary.baseUrl http://127.0.0.1:11434/v1
+npx cc-ping config set summary.model llama3.1
+npx cc-ping config set summary.apiKeyEnv OPENAI_API_KEY
 npx cc-ping config validate
 ```
 
@@ -59,6 +64,35 @@ The config command validates the same schema used by `doctor`, preserves existin
 ## Event Types
 
 `Stop` and `SubagentStop` send `done`. Most `Notification` events send `waiting`; `notification_type` values `permission_prompt` and `elicitation_dialog` send `error` because they require attention. Claude Code failure signals such as `StopFailure`, if routed to this hook in the future, also map to `error`.
+
+## Summaries
+
+For `done` events, cc-ping adds an optional `summary` field to the overlay event. The default mode is a local heuristic: it tail-reads the transcript, looks only after the most recent user message, and emits one short line such as:
+
+```text
+edited 3 files · ran tests · 2 commits
+```
+
+If the transcript is unreadable or the heuristic is unsure, `summary` is `null`.
+
+Summary config:
+
+```json
+{
+  "summary": {
+    "mode": "heuristic",
+    "baseUrl": null,
+    "model": null,
+    "apiKeyEnv": null
+  }
+}
+```
+
+Modes:
+
+- `off`: always send `summary: null`.
+- `heuristic`: local, no network, default.
+- `llm`: call an OpenAI-compatible `/chat/completions` endpoint with a short timeout; reads the API key from `apiKeyEnv`; falls back to heuristic on any failure.
 
 ## Bundled Overlay Installers
 
@@ -81,6 +115,7 @@ Optional config lives at `~/.cc-ping/config.json`:
   "bell": true,
   "overlay": true,
   "overlayPort": 47321,
+  "summary": { "mode": "heuristic", "baseUrl": null, "model": null, "apiKeyEnv": null },
   "quietProjects": []
 }
 ```

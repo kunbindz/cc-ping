@@ -8,10 +8,11 @@ export const DEFAULT_CONFIG = {
   overlay: true,
   overlayPort: 47321,
   sounds: { done: 'ting', waiting: 'soft', error: 'buzz' },
+  summary: { mode: 'heuristic', baseUrl: null, model: null, apiKeyEnv: null },
   quietProjects: [],
 };
 
-export const CONFIG_KEYS = ['minDurationMs', 'bell', 'overlay', 'overlayPort', 'sounds', 'quietProjects'];
+export const CONFIG_KEYS = ['minDurationMs', 'bell', 'overlay', 'overlayPort', 'sounds', 'summary', 'quietProjects'];
 
 export function configPath() {
   return path.join(os.homedir(), '.cc-ping', 'config.json');
@@ -86,6 +87,20 @@ export function validateConfig(value) {
       }
     }
   }
+  if ('summary' in value) {
+    if (!isPlainObject(value.summary)) {
+      issues.push('summary must be an object');
+    } else {
+      if ('mode' in value.summary && !['off', 'heuristic', 'llm'].includes(value.summary.mode)) {
+        issues.push('summary.mode must be off, heuristic, or llm');
+      }
+      for (const key of ['baseUrl', 'model', 'apiKeyEnv']) {
+        if (key in value.summary && value.summary[key] != null && typeof value.summary[key] !== 'string') {
+          issues.push(`summary.${key} must be a string or null`);
+        }
+      }
+    }
+  }
   if (
     'quietProjects' in value &&
     (!Array.isArray(value.quietProjects) || value.quietProjects.some((item) => typeof item !== 'string'))
@@ -107,6 +122,9 @@ export function mergeConfig(value) {
   }
   if (isPlainObject(value.sounds)) {
     cfg.sounds = { ...cfg.sounds, ...value.sounds };
+  }
+  if (isPlainObject(value.summary)) {
+    cfg.summary = { ...cfg.summary, ...value.summary };
   }
   if (Array.isArray(value.quietProjects)) {
     cfg.quietProjects = value.quietProjects.filter((item) => typeof item === 'string');
@@ -143,6 +161,11 @@ export function parseConfigValue(key, rawValue) {
     if (!isPlainObject(parsed)) throw new Error('sounds must be a JSON object');
     return parsed;
   }
+  if (key === 'summary') {
+    const parsed = JSON.parse(rawValue);
+    if (!isPlainObject(parsed)) throw new Error('summary must be a JSON object');
+    return parsed;
+  }
   if (key.startsWith('sounds.')) {
     const soundKey = key.slice('sounds.'.length);
     if (!['done', 'waiting', 'error'].includes(soundKey)) {
@@ -150,6 +173,17 @@ export function parseConfigValue(key, rawValue) {
     }
     if (rawValue === 'null') return null;
     if (rawValue === 'false') return false;
+    return rawValue;
+  }
+  if (key.startsWith('summary.')) {
+    const summaryKey = key.slice('summary.'.length);
+    if (!['mode', 'baseUrl', 'model', 'apiKeyEnv'].includes(summaryKey)) {
+      throw new Error('summary key must be mode, baseUrl, model, or apiKeyEnv');
+    }
+    if (summaryKey === 'mode' && !['off', 'heuristic', 'llm'].includes(rawValue)) {
+      throw new Error('summary.mode must be off, heuristic, or llm');
+    }
+    if (rawValue === 'null') return null;
     return rawValue;
   }
   throw new Error(`unknown config key: ${key}`);
@@ -160,6 +194,9 @@ export function setConfigValue(config, key, value) {
   if (key.startsWith('sounds.')) {
     const soundKey = key.slice('sounds.'.length);
     next.sounds = isPlainObject(next.sounds) ? { ...next.sounds, [soundKey]: value } : { [soundKey]: value };
+  } else if (key.startsWith('summary.')) {
+    const summaryKey = key.slice('summary.'.length);
+    next.summary = isPlainObject(next.summary) ? { ...next.summary, [summaryKey]: value } : { [summaryKey]: value };
   } else {
     next[key] = value;
   }
@@ -181,6 +218,7 @@ function cloneDefaultConfig() {
   return {
     ...DEFAULT_CONFIG,
     sounds: { ...DEFAULT_CONFIG.sounds },
+    summary: { ...DEFAULT_CONFIG.summary },
     quietProjects: [...DEFAULT_CONFIG.quietProjects],
   };
 }
