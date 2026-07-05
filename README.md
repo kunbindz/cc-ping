@@ -27,13 +27,16 @@ signal — so you waste time checking back. cc-ping gives you two independent si
 1. **Terminal bell** — always works (tmux/screen/Windows), race-free. This alone is a useful
    install with zero extra apps.
 2. **Mascot + sound** — an optional lightweight background app that plays a sound and animates
-   the Chef Crab running out from the corner, showing which project just finished. If it isn't
-   running, you still get the bell.
+   the Chef Crab running out from the corner. If it isn't running, you still get the bell.
 
-It distinguishes three situations:
-- **done** — a task/turn finished (cheerful "ting", crab waves a claw).
-- **waiting** — Claude is waiting for your input/approval (soft tone, gentle wave).
-- **error** — needs attention (low buzz, crab trembles).
+It distinguishes three situations, and shows a one-line summary of **what Claude just did**:
+- **done** — a task finished (cheerful "ting", crab waves) → e.g. *"edited 3 files · ran tests · 2 commits"*.
+- **waiting** — Claude needs your input/approval (soft tone, gentle wave).
+- **error** — a permission prompt / needs attention (low buzz, crab trembles).
+
+The summary is built locally from the transcript (no cloud, no key). Optionally you can point it
+at your own OpenAI-compatible endpoint for nicer phrasing — off by default, always falls back to
+the local summary.
 
 ## How it works
 
@@ -51,25 +54,36 @@ Architecture and the hook↔overlay protocol are documented in
 
 ## Install
 
-### 1. The hook (required — gives you the bell)
+### Fastest — the app (one download, no terminal) ⭐
+1. Download the build for your OS from the [latest release](../../releases/latest):
+   **Windows** `.msi` · **macOS** `.dmg` (universal) · **Linux** `.AppImage`.
+2. Launch it — it lives in your **system tray** (the crab icon).
+3. Right-click the tray icon → **Enable in Claude Code** (it wires the hook for you), and
+   optionally **Start at login**.
+
+That's it — run a Claude Code task and the crab runs out. No terminal, no npm.
+
+### Or via the CLI
+Prefer the terminal, or only want the bell (no app)?
 ```bash
 npx cc-ping install
 ```
 This merges hook entries for `Stop`, `SubagentStop`, and `Notification` into
 `~/.claude/settings.json` (non-destructive and idempotent — it won't touch your other hooks).
+Add the app later for sound + mascot.
 
-### 2. The overlay (optional — gives you sound + mascot)
-Download the build for your OS from the [latest release](../../releases/latest):
-- **Windows:** `.msi`
-- **macOS:** `.dmg`
-- **Linux:** `.AppImage`
-
-Launch it once; it lives in your system tray (right-click for **Quiet** / **Quit**). It starts
-hidden and only appears when the crab runs out.
+## Commands
+```bash
+npx cc-ping install | uninstall          # wire / unwire the hook
+npx cc-ping doctor                       # health check: hook? overlay? Claude Code version? config?
+npx cc-ping test [--type done|waiting|error]   # fire a test event at the overlay
+npx cc-ping config get | set <k> <v> | validate  # view/edit ~/.cc-ping/config.json
+```
 
 ## Configure
 
-Optional. Create `~/.cc-ping/config.json` (all keys optional — defaults shown):
+Optional. Config lives at `~/.cc-ping/config.json` — edit it by hand or via `cc-ping config`.
+All keys optional; defaults shown:
 ```json
 {
   "minDurationMs": 10000,
@@ -77,19 +91,20 @@ Optional. Create `~/.cc-ping/config.json` (all keys optional — defaults shown)
   "overlay": true,
   "overlayPort": 47321,
   "sounds": { "done": "ting", "waiting": "soft", "error": "buzz" },
+  "summary": { "mode": "heuristic" },
   "quietProjects": []
 }
 ```
 - `minDurationMs` — only notify for tasks longer than this (avoids spam on quick turns).
-  "waiting" notifications always fire.
+  `waiting`/`error` always fire.
 - `quietProjects` — project folder names to stay fully silent for.
 - `sounds` — set any value to `"none"` to mute that type.
+- `summary.mode` — `"heuristic"` (local, default) · `"llm"` (your own OpenAI-compatible endpoint:
+  add `baseUrl`, `model`, `apiKeyEnv`; falls back to heuristic; no key is bundled) · `"off"`.
 
 ## Uninstall
-```bash
-npx cc-ping uninstall    # removes only cc-ping's hook entries; leaves your other hooks intact
-```
-Then quit the overlay from its tray icon and delete the app.
+- **From the app:** tray → **Disable in Claude Code**, then Quit and delete the app.
+- **CLI:** `npx cc-ping uninstall` (removes only cc-ping's hook entries; leaves your other hooks intact).
 
 ## Requirements
 - **Claude Code ≥ v2.1.141** for the terminal bell (`terminalSequence`). On older versions the
@@ -109,7 +124,8 @@ for running the app locally.
 ```bash
 corepack enable && corepack prepare pnpm@9.12.0 --activate
 pnpm install
-pnpm test:hook        # hook acceptance suite
+pnpm test:hook        # hook acceptance suite (Node)
+pnpm test:overlay     # overlay unit tests (cargo test)
 pnpm overlay:dev      # run the overlay
 ```
 
