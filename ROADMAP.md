@@ -105,6 +105,28 @@ Claude fix during review: min-duration threshold applies to `done` only, so `wai
    `waiting`; decide `elicitation_complete/response` (likely silent). Add tests.
 3. **Hardening tests**: malformed/huge transcripts, posix vs windows path quoting in install.
 
-The **real** remaining gap is P1-4 **verification on actual macOS/Linux** (needs machines — the
-overlay window/transparency/audio, and the installed-MSI hook path) and **P0-3 publish**. Those
-aren't Codex-doable. Keep all tests green; don't touch `packages/overlay/`.
+### Round 6 — v1.0 headliner: task summary (current)
+Make the notification say **what** Claude did. See [FEATURE_PLAN.md](FEATURE_PLAN.md) v1.0.
+1. **Heuristic transcript summary (no LLM).** In `notify.mjs` (hot path — must stay fast, exit-0,
+   never throw), derive a one-line summary from the transcript JSONL and send it as the new
+   `summary` field in the `/event` body (CONTRACT §2 — already added). Parse tool-use entries since
+   the last user message and produce a compact phrase, e.g. `"edited 3 files · ran tests · 2 commits"`.
+   - Only for `type === "done"`. `<= ~120 chars`, single line, no newlines. On any doubt → omit
+     (`summary` null); the bubble just shows the mood text as today.
+   - **Perf:** don't fully read huge transcripts if avoidable (tail-read / cap lines); the hook
+     budget is < ~150 ms. Reuse the JSONL parsing already in `estimateDurationMs`.
+   - Tests: given a fake transcript with N tool uses → expect the summary string; malformed →
+     null; huge → still fast.
+2. **Optional BYO-LLM summary (later, off by default).** `~/.cc-ping/config.json`
+   `summary: { mode: "off|heuristic|llm", baseUrl, model, apiKeyEnv }`. `llm` calls an
+   OpenAI-compatible endpoint with a short timeout and **falls back to heuristic** on any
+   error/timeout. Never ship a key; read it from the named env var only. Do heuristic first; ship
+   LLM only if #1 is solid.
+
+Coordinate: Claude does the overlay side (render `summary` under the mascot, wrap/elide long text).
+The `summary` field shape is frozen in CONTRACT §2. Keep tests green; don't touch `packages/overlay/`.
+
+---
+
+Not Codex-doable (needs the user): P1-4 **GUI verification on real macOS/Linux**, **P0-3 publish**
+the release, and any secrets (`NPM_TOKEN`, BYO-LLM key).

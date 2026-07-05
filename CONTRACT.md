@@ -49,9 +49,14 @@ Request body (`Content-Type: application/json`):
   "sessionId": "abc123",     // optional string | null
   "agentType": null,         // optional string | null (from SubagentStop)
   "durationMs": 47213,       // optional number | null (null = unknown)
+  "summary": "edited 3 files, ran tests", // optional string | null (v1.0). One short line,
+                             //   <= ~120 chars, no newlines. null/absent = no summary line.
   "ts": 1719560000000        // REQUIRED. number. Unix epoch millis (Date.now()).
 }
 ```
+The overlay treats every field beyond `type` as optional display data — an older overlay that
+doesn't know `summary` simply ignores it, and a newer overlay renders it under the mascot when
+present. This is how the seam evolves: additive optional fields, no version negotiation.
 Overlay responds **`204 No Content`** with empty body. The overlay MUST NOT make the hook
 wait: parse fast, hand off to the UI thread asynchronously, return 204 immediately.
 
