@@ -1,6 +1,6 @@
 [package]
 name = "cc-ping-overlay"
-version = "0.1.0"
+version = "0.2.0"
 description = "cc-ping overlay — background mascot + sound notifier for Claude Code"
 authors = ["cc-ping contributors"]
 edition = "2021"

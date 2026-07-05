@@ -1,6 +1,6 @@
 {
   "name": "cc-ping",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Claude Code hook handler for cc-ping: terminal bell + fire-and-forget event to the cc-ping overlay.",
   "type": "module",
   "main": "./notify.mjs",
