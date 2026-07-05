@@ -30,6 +30,7 @@ function handleEvent(payload) {
   const type = payload?.type || "done";
 
   mascot.setMood(type);
+  mascot.setSummary(payload?.summary);
 
   // Rust has already shown the window; run the crab in (or just update mood on a burst).
   if (!mascot.isVisible()) {

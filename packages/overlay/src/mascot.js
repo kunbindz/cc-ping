@@ -64,6 +64,7 @@ export class Mascot {
     this.ctx = this.cv.getContext("2d");
     this.bubble = document.getElementById("bubble");
     this.bubbleText = document.getElementById("bubble-text");
+    this.bubbleSummary = document.getElementById("bubble-summary");
     this.onHidden = onHidden;
 
     this.type = "done";
@@ -89,6 +90,11 @@ export class Mascot {
   setMood(type) {
     this.type = MOODS[type] ? type : "done";
     this.bubbleText.textContent = MOODS[this.type];
+  }
+
+  /** Optional one-line "what happened" summary (CONTRACT §2). Empty/absent hides the line. */
+  setSummary(summary) {
+    this.bubbleSummary.textContent = typeof summary === "string" ? summary : "";
   }
 
   /** Run in (or reverse a run-out back in). */
