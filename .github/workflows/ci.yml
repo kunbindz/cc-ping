@@ -25,7 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # ubuntu-22.04 (matches release.yml): libappindicator3-dev isn't packaged on 24.04.
+        os: [ubuntu-22.04, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -34,7 +35,7 @@ jobs:
           workspaces: packages/overlay/src-tauri
       # Linux is the only platform that needs extra system libs for the Tauri crate to compile.
       - name: Install Linux deps
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
