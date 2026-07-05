@@ -225,3 +225,4 @@ curl -X POST http://127.0.0.1:47321/event -H 'content-type: application/json' \
 - "What is Codex supposed to do?" → [CODEX_BRIEF.md](CODEX_BRIEF.md)
 - "Is this hook field real?" → §6 here (already verified — don't re-check from memory)
 - "What are we optimizing next / who owns what after v0.1.0?" → [ROADMAP.md](ROADMAP.md)
+- "What features are we building toward (v0.2 → v2)?" → [FEATURE_PLAN.md](FEATURE_PLAN.md)
